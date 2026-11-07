@@ -7,11 +7,11 @@ namespace MaceMod.Shared
     // contain these sources, but one process owns one transport and hit loop.
     internal sealed class MaceClient : IDisposable
     {
-        internal const string Slot="TotemMace.CooperativeRuntime.v1";
+        internal const string Slot="TotemMace.CooperativeRuntime.v2";
         private readonly IDictionary<string,object> actions;
         private bool disposed;
         private MaceClient(IDictionary<string,object> actions) { this.actions=actions; }
-        internal static MaceClient Connect(string owner,Func<bool> allowed,Func<bool> tryTotem,Action<string> notice,Action commitTotem=null)
+        internal static MaceClient Connect(string owner,Func<bool> allowed,Func<bool> tryTotem,Action<string> notice,Action commitTotem=null,Func<bool> authorizeEquip=null,Func<byte[],byte[]> signState=null)
         {
             IDictionary<string,object> bus=AppDomain.CurrentDomain.GetData(Slot) as IDictionary<string,object>;
             if(bus==null)
@@ -19,8 +19,8 @@ namespace MaceMod.Shared
                 bus=new MaceRuntime().Bus;
                 AppDomain.CurrentDomain.SetData(Slot,bus);
             }
-            var attach=(Func<string,Func<bool>,Func<bool>,Action<string>,Action,IDictionary<string,object>>)bus["attach"];
-            return new MaceClient(attach(owner,allowed,tryTotem,notice,commitTotem));
+            var attach=(Func<string,Func<bool>,Func<bool>,Action<string>,Action,Func<bool>,Func<byte[],byte[]>,IDictionary<string,object>>)bus["attach"];
+            return new MaceClient(attach(owner,allowed,tryTotem,notice,commitTotem,authorizeEquip,signState));
         }
         internal bool Equipped { get { return !disposed && ((Func<bool>)actions["equipped"])(); } }
         internal string Status { get { return disposed ? "Mace stopped" : ((Func<string>)actions["status"])(); } }

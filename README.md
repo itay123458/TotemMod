@@ -1,6 +1,6 @@
 # Totem Mod
 
-Version **1.9.0**, with Mace Mod **1.0.0**, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.9.1**, with Mace Mod **1.0.1**, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
@@ -51,13 +51,13 @@ Other experiments include recoloring the classic totem, crystal/block/star shape
 
 ## Minecraft mace
 
-The separate mod lives in `mace mod/` and builds to `mace mod/artifacts/MaceMod.dll`. It needs BepInEx and Utilla; it does not require Totem Mod. Install that DLL in `BepInEx/plugins` to equip a mace with **B** or keyboard **M**. **F8** opens its desktop settings. The Totem developer can also equip and configure a mace under **Dev / Mace and Enchantments**, including when only Totem Mod is installed.
+The separate receiver mod lives in `mace mod/` and builds to `mace mod/artifacts/MaceMod.dll`. It needs BepInEx and Utilla; it does not require Totem Mod to receive hits. **F8** opens incoming-hit, particle and sound preferences. **Only the developer can equip a mace, and only from Totem's Dev / Mace and Enchantments page.** B, M and desktop equip controls are removed. The developer's authenticated Steam account and private signing key are required; editing a config or becoming room master does not unlock the weapon.
 
-Mace hits work only in **private modded standard Infection / Tag**, between users running Mace Mod 1.0.0 or Totem Mod 1.9.0 or newer. Older Totem versions and vanilla players are unaffected. Receiving hits can be disabled in the active mod's settings. When both mods are installed, one shared runtime handles input, peer messages, effects and physics. The developer's Totem settings take priority; other accounts use standalone Mace settings when installed.
+Mace hits work only in **private modded standard Infection / Tag**, between users running Mace Mod 1.0.1 or Totem Mod 1.9.1 or newer. The new protocol rejects unsigned equipped states and binds the developer's proof to their actual account, room, actor, session, state and revision. Old unrestricted mace clients cannot attack updated receivers. Receiving hits can be disabled in the active mod's settings. When both mods are installed, one shared runtime handles peer messages, effects and physics. The developer's Totem settings take priority; other accounts use standalone receiver settings when installed.
 
 Swing the mace head into a participating player. Falling distance determines smash strength: one block equals one meter at normal player scale. Grounding, new ascent, teleports, stale samples and completed hits clear old fall credit. Hit geometry, recent swing history, range, walls, current opt-in, fresh sessions and message order are checked again by the recipient.
 
-An **untagged attacker knocks the target back**. The target's own mod applies bounded local velocity. A **tagged attacker requests a native tag** unless the target has an equipped, charged totem and the current Totem rules permit protection. A save spends one charge after the acknowledged hit is published and plays the normal totem pop. Actual infection changes require the room host to run either compatible mod; native `ReportTag` validation, cooldown and normal synchronization remain in use. The mace never takes host authority.
+An **untagged attacker knocks the target back**. The target's own mod applies bounded local velocity. A **tagged attacker requests a native tag** unless the target has an equipped, charged totem and the current Totem rules permit protection. A save spends one charge after the acknowledged hit is published and plays the normal totem pop. The developer can use the mace as a guest: after a validated, acknowledged strike, the local attacker uses the game's ordinary `GameMode.ReportTag` path. The host applies native tag validation and cooldown through normal synchronization; the host does not need Mace Mod for this path. No host takeover is used.
 
 **Density 0–V** increases falling-hit strength, **Knockback 0–II** adds shove strength, and **Wind Burst 0–III** gives the attacker an upward rebound after a smash of at least 1.5 blocks. These are Gorilla Tag adaptations; there is no Minecraft armor system, so Breach is not included. Size, power, impact particles, sounds and opaque enchantment shimmer are configurable. The mace texture, critical-hit pixels and hit/smash/wind audio come from the local Minecraft installation. Enchantment reference: [Minecraft's Tricky Trials release notes](https://feedback.minecraft.net/hc/en-us/articles/27547857163917-Minecraft-Java-Edition-1-21-Tricky-Trials).
 

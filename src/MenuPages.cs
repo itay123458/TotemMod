@@ -235,7 +235,7 @@ namespace TotemMod
                     new MenuPage("Mace effects",new[] {
                         Check("Mace particles",maceParticles),Check("Mace sounds",maceSound),Check("Enchantment shimmer",maceGlint),
                         Check("Accept mace hits",maceReceive),
-                        new MenuEntry(()=>"B or keyboard M toggles your mace",null),
+                        new MenuEntry(()=>"Equip only from the Dev menu",null),
                         new MenuEntry(()=>"Fall further for a stronger hit",null),
                         new MenuEntry(()=>"Updated Mace / Totem peers only",null)
                     }),

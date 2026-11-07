@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using MaceMod.Shared;
 using Photon.Pun;
 using Photon.Realtime;
@@ -22,6 +23,7 @@ namespace Photon.Realtime
     public sealed class Player
     {
         public int ActorNumber;
+        public string UserId;
         public bool IsInactive, FailSend;
         public readonly Hashtable CustomProperties = new Hashtable();
         public readonly List<Hashtable> Sent = new List<Hashtable>();
@@ -50,7 +52,15 @@ namespace Photon.Pun
 internal static class MaceProtocolTests
 {
     private const string A = "11111111111111111111111111111111", B = "22222222222222222222222222222222";
-    private static int checks;
+    private static int checks, signatures, verifications;
+    private static byte[] Sign(byte[] payload) { signatures++; using (SHA256 hash = SHA256.Create()) return hash.ComputeHash(payload); }
+    private static bool Verify(byte[] payload, byte[] signature)
+    {
+        verifications++; byte[] expected; using (SHA256 hash = SHA256.Create()) expected = hash.ComputeHash(payload);
+        if (signature == null || signature.Length != expected.Length) return false;
+        for (int i = 0; i < expected.Length; i++) if (signature[i] != expected[i]) return false;
+        return true;
+    }
     private static void Check(bool value, string label) { checks++; if (!value) throw new Exception(label); }
     private static MaceState State(string session) { return new MaceState(session, true, true, 3, 1, 2, 1.25f, true); }
     private static void Models()
@@ -89,11 +99,12 @@ internal static class MaceProtocolTests
         public MaceState State;
         public bool Allowed = true;
         public int States, Hits, Receipts, Removed;
-        public Peer(int actor, string session)
+        public Peer(int actor, string session, bool canSign = true, bool canVerify = true)
         {
             State = MaceProtocolTests.State(session);
-            Player = new Player { ActorNumber = actor }; PhotonNetwork.CurrentRoom.Players.Add(actor, Player); Use();
-            Transport = new MaceTransport(() => Allowed, (a, s) => States++, (a, h) => Hits++, (a, r) => Receipts++, a => Removed++);
+            Player = new Player { ActorNumber = actor, UserId = "native-account-" + actor }; PhotonNetwork.CurrentRoom.Players.Add(actor, Player); Use();
+            Transport = new MaceTransport(() => Allowed, (a, s) => States++, (a, h) => Hits++, (a, r) => Receipts++, a => Removed++,
+                canSign ? (Func<byte[], byte[]>)Sign : null, canVerify ? (Func<byte[], byte[], bool>)Verify : null);
         }
         public void Use() { PhotonNetwork.LocalPlayer = Player; }
         public void Tick(float time) { Use(); Transport.Tick(State, time); }
@@ -183,7 +194,7 @@ internal static class MaceProtocolTests
         source.State = new MaceState(A, false, false, 0, 0, 0, 1f, true); source.Tick(3f);
         Check(!source.Hit(2, B, 5, 3f), "Disabled attacker cannot send");
         // A restarted mod begins revision numbering from one with a new nonce.
-        target.Player.CustomProperties[MaceTransport.StateKey] = new object[] { 1, "private-modded", 1, State("44444444444444444444444444444444").Encode() };
+        target.Use(); target.Transport.Reset(); target.State = State("44444444444444444444444444444444"); target.Tick(3f);
         int oldStates = source.States; source.Event(target, MaceTransport.StateKey);
         Check(source.States == oldStates + 1, "Fresh session accepts restarted state revision");
         source.Use(); PhotonNetwork.InRoom = false; Check(!source.Transport.SendHit(new MaceHit(A, 2, B, 6, 203d, 1f, 0f, 0f, 0f), 4f), "Send requires InRoom");
@@ -207,9 +218,104 @@ internal static class MaceProtocolTests
         Check(allocated < 1024, "Already-empty Reset must not allocate per frame: " + allocated + " bytes");
         idle.Dispose();
     }
+    private static void Authentication()
+    {
+        PhotonNetwork.CurrentRoom = new Room(); PhotonNetwork.InRoom = true; PhotonNetwork.OfflineMode = false;
+        Player player = new Player { ActorNumber = 7, UserId = "native-account-7" }; PhotonNetwork.CurrentRoom.Players.Add(7, player); PhotonNetwork.LocalPlayer = player;
+        MaceTransport receiver = new MaceTransport(() => true, null, null, null, null);
+        receiver.Tick(State(A), 0f);
+        object[] frame = (object[])player.CustomProperties[MaceTransport.StateKey]; MaceState decoded;
+        Check(MaceState.TryDecode(frame[3], out decoded) && !decoded.Equipped && decoded.Receive, "Unsigned client cannot publish equipped state");
+        receiver.Dispose();
+
+        PhotonNetwork.CurrentRoom = new Room(); PhotonNetwork.Time = 300d;
+        Peer developer = new Peer(7, A), target = new Peer(8, B, false);
+        developer.Tick(0f); target.Tick(0f); developer.Event(target, MaceTransport.StateKey); target.Event(developer, MaceTransport.StateKey);
+        object[] good = (object[])developer.Player.CustomProperties[MaceTransport.StateKey];
+        object[] receiveOnly = (object[])target.Player.CustomProperties[MaceTransport.StateKey];
+        Check(MaceTransport.StateKey == "mace.s2" && MaceTransport.HitKey == "mace.h2" && MaceTransport.ReceiptKey == "mace.r2", "Legacy property namespace excluded");
+        Check(good.Length == 5 && (int)good[0] == 2 && good[4] is byte[], "Equipped v2 frame carries proof");
+        Check(receiveOnly[4] == null && target.States == 1, "Unsigned receive-only peer accepts signed developer");
+        int signedBefore = signatures, verifiedBefore = verifications;
+        for (int i = 1; i <= 50; i++) { developer.Tick(i * .02f); target.Tick(i * .02f); }
+        Check(signatures == signedBefore && verifications == verifiedBefore, "Idle equipped and receive-only ticks perform no signing or RSA verification");
+        target.Event(developer, MaceTransport.StateKey); Check(verifications == verifiedBefore, "Repeated validated frame does not verify again");
+        Check(developer.Hit(8, B, 1, 1f), "Authenticated non-master can wield against unsigned receiver");
+        target.Event(developer, MaceTransport.HitKey); Check(target.Hits == 1, "Unsigned receiver accepts current authenticated hit");
+        Check(verifications == verifiedBefore, "Hit uses verified state cache without RSA");
+        Check(target.Receipt(7, A, 1), "Receive-only client can acknowledge authenticated hit");
+        int receivedStates = target.States;
+        object[] tampered = (object[])good.Clone(); object[] settings = (object[])((object[])good[3]).Clone(); settings[4] = 5; tampered[3] = settings;
+        developer.Player.CustomProperties[MaceTransport.StateKey] = tampered; target.Event(developer, MaceTransport.StateKey);
+        Check(target.States == receivedStates && target.Removed == 1, "Proof binds enchantment fields");
+        developer.Player.CustomProperties[MaceTransport.StateKey] = good; target.Event(developer, MaceTransport.StateKey);
+        Check(target.States == receivedStates + 1, "Valid proof restores invalidated peer without losing history");
+        foreach (int field in new int[] { 2, 3, 5, 6, 7, 8, 9 })
+        {
+            tampered = (object[])good.Clone(); settings = (object[])((object[])good[3]).Clone();
+            if (settings[field] is bool) settings[field] = !(bool)settings[field];
+            else if (settings[field] is int) settings[field] = 0;
+            else settings[field] = .5f;
+            tampered[3] = settings;
+            // Equipped->false requires removing the proof; keeping it must fail.
+            int statesBefore = target.States; developer.Player.CustomProperties[MaceTransport.StateKey] = tampered; target.Event(developer, MaceTransport.StateKey);
+            Check(target.States == statesBefore, "Proof binds complete state field " + field);
+            developer.Player.CustomProperties[MaceTransport.StateKey] = good; target.Event(developer, MaceTransport.StateKey);
+        }
+        tampered = (object[])good.Clone(); tampered[2] = 2;
+        int priorStates = target.States; developer.Player.CustomProperties[MaceTransport.StateKey] = tampered; target.Event(developer, MaceTransport.StateKey);
+        Check(target.States == priorStates, "Proof binds revision");
+        developer.Player.CustomProperties[MaceTransport.StateKey] = good; target.Event(developer, MaceTransport.StateKey);
+        tampered = (object[])good.Clone(); settings = (object[])((object[])good[3]).Clone(); settings[1] = B; tampered[3] = settings;
+        priorStates = target.States; developer.Player.CustomProperties[MaceTransport.StateKey] = tampered; target.Event(developer, MaceTransport.StateKey);
+        Check(target.States == priorStates, "Proof binds original source nonce");
+        developer.Player.CustomProperties[MaceTransport.StateKey] = good; target.Event(developer, MaceTransport.StateKey);
+        tampered = (object[])good.Clone(); tampered[4] = null; priorStates = target.States;
+        developer.Player.CustomProperties[MaceTransport.StateKey] = tampered; target.Event(developer, MaceTransport.StateKey);
+        Check(target.States == priorStates, "Unsigned equipped remote rejected");
+        developer.Player.CustomProperties[MaceTransport.StateKey] = good; target.Event(developer, MaceTransport.StateKey);
+        // Copies use actual server identities, never a claimed custom property ID.
+        priorStates = developer.States; target.Player.CustomProperties[MaceTransport.StateKey] = good; developer.Event(target, MaceTransport.StateKey);
+        Check(developer.States == priorStates, "Copied proof bound to actual actor and native account");
+        target.Player.UserId = developer.Player.UserId; developer.Event(target, MaceTransport.StateKey);
+        Check(developer.States == priorStates, "Same claimed/native account cannot copy proof to different actor");
+        target.Player.UserId = "native-account-8"; target.Player.CustomProperties[MaceTransport.StateKey] = receiveOnly; developer.Event(target, MaceTransport.StateKey);
+        string originalId = developer.Player.UserId; developer.Player.UserId = "different-account"; priorStates = target.States;
+        target.Event(developer, MaceTransport.StateKey); Check(target.States == priorStates, "Native account change invalidates copied proof");
+        Check(!developer.Hit(8, B, 2, 2f), "Own cached proof cannot survive native account change");
+        developer.Player.UserId = originalId; target.Event(developer, MaceTransport.StateKey);
+        tampered = (object[])good.Clone(); byte[] altered = (byte[])((byte[])good[4]).Clone(); altered[0] ^= 1; tampered[4] = altered;
+        developer.Player.CustomProperties[MaceTransport.StateKey] = tampered;
+        Check(!developer.Hit(8, B, 2, 2f), "Current hit rejects signature tampering before callback");
+        priorStates = target.States; target.Event(developer, MaceTransport.StateKey); Check(target.States == priorStates, "Invalid signature rejected");
+        developer.Player.CustomProperties[MaceTransport.StateKey] = new object[] { 1, "private-modded", 1, State(A).Encode() };
+        target.Event(developer, MaceTransport.StateKey); Check(target.States == priorStates, "Legacy unrestricted wrapper rejected on v2 key");
+        developer.Player.CustomProperties[MaceTransport.StateKey] = good;
+        developer.Player.CustomProperties["mace.s1"] = good;
+        target.Event(developer, "mace.s1"); Check(target.States == priorStates, "Old key callback cannot restore equipped state");
+        PhotonNetwork.CurrentRoom.Name = "another-private-room";
+        tampered = (object[])good.Clone(); tampered[1] = "another-private-room"; developer.Player.CustomProperties[MaceTransport.StateKey] = tampered;
+        Peer otherRoom = new Peer(9, "99999999999999999999999999999999", false); otherRoom.Tick(0f);
+        Check(otherRoom.States == 0, "Valid proof cannot be rebound to another room wrapper");
+        otherRoom.Dispose(); developer.Dispose(); target.Dispose();
+
+        PhotonNetwork.CurrentRoom = new Room(); Peer noIdentity = new Peer(4, A); noIdentity.Player.UserId = null; noIdentity.Tick(0f);
+        frame = (object[])noIdentity.Player.CustomProperties[MaceTransport.StateKey];
+        Check(MaceState.TryDecode(frame[3], out decoded) && !decoded.Equipped, "Missing native identity fails closed");
+        noIdentity.Player.UserId = new string('a', 129); noIdentity.Tick(.25f); frame = (object[])noIdentity.Player.CustomProperties[MaceTransport.StateKey];
+        Check(MaceState.TryDecode(frame[3], out decoded) && !decoded.Equipped, "Oversized native identity fails closed"); noIdentity.Dispose();
+        PhotonNetwork.CurrentRoom = new Room(); Peer noVerifier = new Peer(4, A, true, false); noVerifier.Tick(0f);
+        frame = (object[])noVerifier.Player.CustomProperties[MaceTransport.StateKey];
+        Check(MaceState.TryDecode(frame[3], out decoded) && !decoded.Equipped, "Local signer without verifier cannot equip"); noVerifier.Dispose();
+        PhotonNetwork.CurrentRoom = new Room(); player = new Player { ActorNumber = 1, UserId = "native-account-1" }; PhotonNetwork.CurrentRoom.Players.Add(1, player); PhotonNetwork.LocalPlayer = player;
+        MaceTransport brokenSigner = new MaceTransport(() => true, null, null, null, null, delegate(byte[] bytes) { throw new Exception("offline signer"); }, Verify);
+        brokenSigner.Tick(State(A), 0f); frame = (object[])player.CustomProperties[MaceTransport.StateKey];
+        Check(MaceState.TryDecode(frame[3], out decoded) && !decoded.Equipped, "Signer exceptions safely fall back to receiving"); brokenSigner.Dispose();
+        Check(PhotonNetwork.Targets == 0, "Authentication fixtures dispose cleanly");
+    }
     public static int Main()
     {
-        try { Models(); TransportCases(); AdversarialCases(); IdleReset(); Console.WriteLine("Mace protocol: " + checks + " checks passed."); return 0; }
+        try { Models(); Authentication(); TransportCases(); AdversarialCases(); IdleReset(); Console.WriteLine("Mace protocol: " + checks + " checks passed."); return 0; }
         catch (Exception e) { Console.Error.WriteLine(e.Message); return 1; }
     }
 }

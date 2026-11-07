@@ -11,7 +11,7 @@ namespace TotemMod
         private ConfigEntry<int> maceDensity,maceKnockback,maceWind;
         private ConfigEntry<float> maceScale,macePower;
         private ConfigEntry<bool> maceReceive,maceParticles,maceSound,maceGlint;
-        private bool maceButtonBefore,maceForDeveloper;
+        private bool maceForDeveloper;
 
         private void InitializeMace()
         {
@@ -29,7 +29,7 @@ namespace TotemMod
         private void ConnectMace()
         {
             maceForDeveloper=IsDeveloper;
-            mace=MaceClient.Connect(maceForDeveloper ? "totem-dev" : "totem",()=>isActiveAndEnabled && Allowed,CanMaceTotem,text=>ShowNotice(text,false),()=>PopFromTag());
+            mace=MaceClient.Connect(maceForDeveloper ? "totem-dev" : "totem",()=>isActiveAndEnabled && Allowed,CanMaceTotem,text=>ShowNotice(text,false),()=>PopFromTag(),()=>IsDeveloper,SignDeveloperCommand);
         }
         private void StopMace() { if(mace!=null) { mace.Dispose(); mace=null; } }
         private bool CanMaceTotem()
@@ -42,10 +42,6 @@ namespace TotemMod
         {
             if(mace==null) ConnectMace();
             else if(maceForDeveloper!=IsDeveloper) { StopMace(); ConnectMace(); }
-            ControllerInputPoller poller=ControllerInputPoller.instance;
-            bool button=poller!=null && poller.rightControllerSecondaryButton || KeyHeld(KeyCode.M);
-            if(IsDeveloper && Allowed && button && !maceButtonBefore && (menu==null || !menu.IsOpen)) mace.Toggle();
-            maceButtonBefore=button;
             mace.Configure(mace.Equipped,maceDensity.Value,maceKnockback.Value,maceWind.Value,maceScale.Value,
                 maceParticles.Value,maceSound.Value,maceGlint.Value,maceReceive.Value,macePower.Value);
             mace.Suspend(menu!=null && menu.IsOpen);

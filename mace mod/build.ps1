@@ -27,6 +27,7 @@ $taskReferences+=('/reference:'+(Join-Path $GamePath 'BepInEx\plugins\Utilla.dll
 $taskSources=@(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'shared') -Filter '*.cs' | ForEach-Object { $_.FullName })
 $taskSources+=@(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filter '*.cs' | ForEach-Object { $_.FullName })
 $taskSources+=(Join-Path $taskWorkspace 'src\PixelMeshBuilder.cs')
+$taskSources+=(Join-Path $taskWorkspace 'src\DeveloperIdentity.cs')
 $taskSources+=(Join-Path $taskWorkspace 'updater\utilla\UtillaRepairBootstrap.cs')
 $taskResources=@(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'assets') -File | Where-Object { $_.Extension -in '.png','.pcm' } | ForEach-Object { '/resource:'+ $_.FullName+',MaceMod.'+$_.Name })
 $taskResources+=('/resource:'+(Join-Path $taskWorkspace 'artifacts\TotemMod.UtillaFix.dll')+',TotemMod.UtillaFix.dll')

@@ -9,7 +9,7 @@ using MaceMod.Shared;
 internal static class MaceIntegrationTests
 {
     private static int checks;
-    private const string Slot = "TotemMace.CooperativeRuntime.v1";
+    private const string Slot = "TotemMace.CooperativeRuntime.v2";
 
     private static void Check(bool condition, string label)
     { checks++; if (!condition) throw new Exception(label); }
@@ -97,10 +97,10 @@ internal static class MaceIntegrationTests
         return false;
     }
 
-    private static void BooleanGuard(MethodDefinition method, int guard, int protectedCall, string label)
+    private static void BooleanGuard(MethodDefinition method, int guard, int protectedCall, string label, bool requiredValue = true, bool requireDominates = true)
     {
         Check(guard >= 0 && protectedCall > guard, label + " has guard before effect");
-        Check(!Reachable(method, 0, protectedCall, guard), label + " cannot bypass guard");
+        if (requireDominates) Check(!Reachable(method, 0, protectedCall, guard), label + " cannot bypass guard");
         int branch = guard + 1;
         while (branch < method.Body.Instructions.Count && method.Body.Instructions[branch].OpCode.Code == Code.Nop) branch++;
         Instruction conditional = method.Body.Instructions[branch];
@@ -108,7 +108,7 @@ internal static class MaceIntegrationTests
         bool branchOnFalse = conditional.OpCode.Code == Code.Brfalse || conditional.OpCode.Code == Code.Brfalse_S;
         Check(branchOnTrue || branchOnFalse, label + " branches directly on boolean result");
         int jump = method.Body.Instructions.IndexOf((Instruction)conditional.Operand);
-        int success = branchOnTrue ? jump : branch + 1, failure = branchOnTrue ? branch + 1 : jump;
+        int success = branchOnTrue == requiredValue ? jump : branch + 1, failure = branchOnTrue == requiredValue ? branch + 1 : jump;
         Check(Reachable(method, success, protectedCall, -1), label + " permits effect after success");
         Check(!Reachable(method, failure, protectedCall, -1), label + " failure cannot reach effect");
     }
@@ -144,7 +144,8 @@ internal static class MaceIntegrationTests
                 if (cast.FullName.StartsWith("System.Collections.Generic.IDictionary`2", StringComparison.Ordinal)) dictionaryCast = true;
             }
             MethodReference call = instruction.Operand as MethodReference;
-            if (call != null && call.Name == "Invoke" && call.DeclaringType.FullName.StartsWith("System.Func`6", StringComparison.Ordinal))
+            if (call != null && call.Name == "Invoke" && call.DeclaringType.FullName.StartsWith("System.Func`", StringComparison.Ordinal) &&
+                call.DeclaringType.FullName.IndexOf("System.Collections.Generic.IDictionary`2", StringComparison.Ordinal) >= 0)
             { attachInvoke = true; Check(Bcl(call.DeclaringType), "Attach callback contains only BCL parameter and return types"); }
         }
         Check(slot && dictionaryCast && attachInvoke, "Shared runtime uses stable slot plus dictionary/delegate bridge");
@@ -219,12 +220,124 @@ internal static class MaceIntegrationTests
         BooleanGuard(hit, send, commit, "Receipt success gates Totem commit");
         int movement = CallIndex(hit, runtime.FullName, "ApplyVelocity");
         BooleanGuard(hit, send, movement, "Receipt success gates local knockback");
-        int report = CallIndex(receipt, "GorillaGameManager", "ReportTag");
-        if (report < 0) report = CallIndex(receipt, "GorillaTagManager", "ReportTag");
-        Check(report >= 0, "Receipt outcome uses native GorillaTagManager.ReportTag");
-        BooleanGuard(receipt, CallIndex(receipt, runtime.FullName, "Validate"), report, "Host revalidates hit before native tag");
-        BooleanGuard(receipt, CallIndex(receipt, "Photon.Pun.PhotonNetwork", "get_IsMasterClient"), report, "Photon host guard");
-        BooleanGuard(receipt, CallIndex(receipt, "NetworkSystem", "get_IsMasterClient"), report, "NetworkSystem host guard");
+        int report = CallIndex(receipt, "GorillaGameModes.GameMode", "ReportTag");
+        Check(report >= 0, "Receipt outcome uses the game's ordinary authenticated GameMode.ReportTag route");
+        BooleanGuard(receipt, CallIndex(receipt, runtime.FullName, "Validate"), report, "Attacker revalidates hit before native tag request");
+        List<int> tagged = new List<int>();
+        for (int i = 0; i < report; i++) if (IsCall(receipt.Body.Instructions[i], runtime.FullName, "Tagged")) tagged.Add(i);
+        Check(tagged.Count == 2, "Native tag checks both attacker and victim infection state");
+        BooleanGuard(receipt, tagged[0], report, "Native tag requires tagged attacker");
+        BooleanGuard(receipt, tagged[1], report, "Native tag requires untagged victim", false);
+        LocalAttackerGuard(receipt, report);
+    }
+
+    private static void LocalAttackerGuard(MethodDefinition method, int protectedCall)
+    {
+        int comparison = -1;
+        for (int i = 0; i < protectedCall; i++)
+        {
+            if (!IsCall(method.Body.Instructions[i], "MaceMod.Shared.MaceReceipt", "get_SourceActor")) continue;
+            if (i + 3 >= method.Body.Instructions.Count ||
+                !IsCall(method.Body.Instructions[i + 1], "Photon.Pun.PhotonNetwork", "get_LocalPlayer") ||
+                !IsCall(method.Body.Instructions[i + 2], "Photon.Realtime.Player", "get_ActorNumber")) continue;
+            Code opcode = method.Body.Instructions[i + 3].OpCode.Code;
+            if (opcode == Code.Bne_Un || opcode == Code.Bne_Un_S || opcode == Code.Beq || opcode == Code.Beq_S)
+                comparison = i + 3;
+        }
+        Check(comparison >= 0, "Native tag compares receipt source against local actor");
+        Check(!Reachable(method, 0, protectedCall, comparison), "Native tag cannot bypass local attacker comparison");
+        Instruction branch = method.Body.Instructions[comparison];
+        int jump = method.Body.Instructions.IndexOf((Instruction)branch.Operand);
+        bool equalsJump = branch.OpCode.Code == Code.Beq || branch.OpCode.Code == Code.Beq_S;
+        int local = equalsJump ? jump : comparison + 1, remote = equalsJump ? comparison + 1 : jump;
+        Check(Reachable(method, local, protectedCall, -1), "Local attacker may submit ordinary native tag request");
+        Check(!Reachable(method, remote, protectedCall, -1), "Other clients cannot submit attacker's native tag request");
+        Check(CallIndex(method, "Photon.Pun.PhotonNetwork", "get_IsMasterClient") < 0 &&
+              CallIndex(method, "NetworkSystem", "get_IsMasterClient") < 0,
+              "Ordinary native tag request works for an attacker who is not master");
+    }
+
+    private static List<int> EquippedWrites(MethodDefinition method)
+    {
+        List<int> writes = new List<int>();
+        for (int i = 0; i < method.Body.Instructions.Count; i++)
+        {
+            FieldReference field = method.Body.Instructions[i].Operand as FieldReference;
+            if (field != null && field.Name == "equipped" && method.Body.Instructions[i].OpCode.Code == Code.Stfld) writes.Add(i);
+        }
+        return writes;
+    }
+
+    private static void DeveloperAuthorization(ModuleDefinition module, TypeDefinition runtime)
+    {
+        MethodDefinition authorization = Method(runtime, "EquipAuthorized"), toggle = Method(runtime, "Toggle");
+        Check(authorization.ReturnType.FullName == "System.Boolean" && authorization.Parameters.Count == 1,
+            "Equipment authorization evaluates the owning client");
+        bool ownerGate = false, ownerCallback = false, signer = false;
+        foreach (Instruction instruction in authorization.Body.Instructions)
+        {
+            if (instruction.OpCode.Code == Code.Ldstr && (string)instruction.Operand == "totem-dev") ownerGate = true;
+            FieldReference field = instruction.Operand as FieldReference;
+            if (field != null && field.Name == "AuthorizeEquip" && field.FieldType.FullName == "System.Func`1<System.Boolean>") ownerCallback = true;
+            if (field != null && field.Name == "Sign" && field.FieldType.FullName == "System.Func`2<System.Byte[],System.Byte[]>") signer = true;
+        }
+        Check(ownerGate && ownerCallback && signer && CallIndex(authorization, runtime.FullName, "Active") >= 0,
+            "Equipment authorization requires active native developer owner, callback, and signer");
+        Check(CallIndex(toggle, "TotemMod.DeveloperIdentity", "Verify") >= 0, "Equip toggle verifies developer signature before activation");
+        Check(toggle.Parameters.Count == 1, "Toggle is bound to the requesting client");
+        Check(EquippedWrites(Method(runtime, "Configure")).Count == 0, "Configuration cannot equip the mace");
+        List<int> writes = EquippedWrites(toggle);
+        Check(writes.Count > 0, "Authorized toggle updates equipped state");
+        int guard = CallIndex(toggle, runtime.FullName, "EquipAuthorized");
+        foreach (int write in writes) BooleanGuard(toggle, guard, write, "Toggle requires developer equipment authorization");
+        MethodDefinition clear = Method(runtime, "ClearUnauthorized");
+        List<int> clearWrites = EquippedWrites(clear);
+        Check(clearWrites.Count > 0 && CallIndex(clear, runtime.FullName, "EquipAuthorized") >= 0,
+            "Loss of all equipment authorizers clears global equipped state");
+        foreach (int write in clearWrites)
+        {
+            Check(write > 0 && clear.Body.Instructions[write - 1].OpCode.Code == Code.Ldc_I4_0,
+                "Revoked equipment authorization stores false");
+            BooleanGuard(clear, CallIndex(clear, runtime.FullName, "EquipAuthorized"), write,
+                "Any valid equipment authorizer prevents revocation", false, false);
+        }
+        MethodDefinition tick = Method(runtime, "Tick");
+        int clearCall = CallIndex(tick, runtime.FullName, "ClearUnauthorized");
+        int published = CallIndex(tick, "MaceMod.Shared.MaceState", ".ctor");
+        Check(clearCall >= 0 && published > clearCall && !Reachable(tick, 0, published, clearCall),
+            "Tick clears revoked authorization before publishing equipped state");
+
+        TypeDefinition totem = module.GetType("TotemMod.TotemPlugin");
+        if (totem != null)
+        {
+            Check(CallIndex(Method(totem, "TickMace"), "MaceMod.Shared.MaceClient", "Toggle") < 0,
+                "Totem input tick cannot equip; developer menu owns the route");
+            int toggles = 0;
+            foreach (TypeDefinition nested in Types(totem))
+            foreach (MethodDefinition method in nested.Methods)
+            {
+                if (!method.HasBody) continue;
+                foreach (Instruction instruction in method.Body.Instructions)
+                    if (IsCall(instruction, "MaceMod.Shared.MaceClient", "Toggle"))
+                    {
+                        toggles++;
+                        Check(method.Name.IndexOf("BuildMenu", StringComparison.Ordinal) >= 0 ||
+                            method.Name.IndexOf("Developer", StringComparison.Ordinal) >= 0 ||
+                            method.Name.IndexOf("MenuPages", StringComparison.Ordinal) >= 0,
+                            "Mace equip callback belongs to developer menu construction");
+                    }
+            }
+            Check(toggles == 1, "Totem exposes one developer menu equip callback");
+        }
+        TypeDefinition standalone = module.GetType("MaceMod.MacePlugin");
+        if (standalone != null)
+        foreach (TypeDefinition nested in Types(standalone))
+        foreach (MethodDefinition method in nested.Methods)
+        {
+            Check(method.Name != "Toggle" && method.Name != "BDown", "Standalone companion has no equip input methods");
+            if (!method.HasBody) continue;
+            Check(CallIndex(method, "MaceMod.Shared.MaceClient", "Toggle") < 0, "Standalone companion cannot equip mace");
+        }
     }
 
     private static void ForbiddenCalls(ModuleDefinition module, TypeDefinition runtime)
@@ -241,7 +354,9 @@ internal static class MaceIntegrationTests
                 Check(call.Name != "RPC" && call.Name != "RpcSecure" && call.Name != "RaiseEvent" && call.Name != "OpRaiseEvent" && call.Name != "SetMasterClient",
                     "No RPC/custom-event/master reassignment: " + method.FullName + " -> " + call.Name);
                 if ((call.DeclaringType.FullName == "GorillaTagManager" || call.DeclaringType.FullName == "GorillaGameManager") && call.Name == "ReportTag")
-                { reports++; Check(type == runtime && method.Name == "ReceiveReceipt", "Native mace tag only occurs in ReceiveReceipt"); }
+                    Check(false, "Plugin cannot invoke host-native tag validation directly");
+                if (call.DeclaringType.FullName == "GorillaGameModes.GameMode" && call.Name == "ReportTag")
+                { reports++; Check(type == runtime && method.Name == "ReceiveReceipt", "Ordinary native mace tag request only occurs in ReceiveReceipt"); }
                 if (type.Namespace == "MaceMod.Shared")
                 {
                     bool foreignRig = call.Name == ".ctor" && (call.DeclaringType.FullName == "VRRig" || call.DeclaringType.FullName == "GorillaLocomotion.GTPlayer");
@@ -260,7 +375,7 @@ internal static class MaceIntegrationTests
         {
             ModuleDefinition module = assembly.MainModule;
             TypeDefinition runtime = RequiredType(module, "MaceMod.Shared.MaceRuntime");
-            SharedBus(module, runtime); LocalVelocity(module, runtime);
+            DeveloperAuthorization(module, runtime); SharedBus(module, runtime); LocalVelocity(module, runtime);
             CombatOrdering(runtime); ForbiddenCalls(module, runtime);
             Console.WriteLine("Verified cooperative runtime: " + path);
         }

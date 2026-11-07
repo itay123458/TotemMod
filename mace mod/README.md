@@ -1,12 +1,12 @@
-# Minecraft Mace Mod
+# Minecraft Mace Mod 1.0.1
 
-A separate Gorilla Tag BepInEx 5 plugin built in this folder. The same mace runtime is also compiled into Totem Mod. When both are installed, a shared bridge elects one runtime, so there is one held mace, one hit pipeline and one effect stream.
+This standalone Gorilla Tag BepInEx 5 plugin receives authenticated developer mace hits and displays their Minecraft effects. The weapon can be equipped and configured only through Totem Mod's authorized Developer menu. Installing this DLL grants receiver support; it does not grant weapon access.
 
-- **B** on the right controller toggles the mace once per press. **M** does the same when keyboard control is enabled.
-- **F8** opens the standalone settings window. Opening a settings menu pauses outgoing mace hits and hides the held mace.
-- With Totem Mod installed, its **Developer** settings page also exposes mace settings. The Totem Developer page takes priority while its authorized Developer client is active; otherwise the standalone settings apply.
-- Gameplay requires a **private modded standard Infection / Tag room**. Everyone receiving mace effects must run a compatible mace runtime and opt in. The selected settings profile controls incoming-hit consent. Equipping resets on room changes.
-- Enchantments: Density 0�5, Knockback 0�2 and Wind Burst 0�3. Size 0.5�1.5�; power 0.25�2�. Incoming hits, particles, audio and opaque enchantment shimmer have separate switches.
+- **F8** opens receiver settings: incoming-hit consent, particles and sound.
+- The standalone plugin has no controller or keyboard equipment shortcut, equipment button, or weapon/enchantment controls.
+- Gameplay requires a **private modded standard Infection / Tag room**. Participants must run a compatible authenticated mace runtime. Incoming hits default on and can be disabled in receiver settings.
+- With Totem Mod installed, a shared bridge selects one runtime. The authorized Totem Developer profile controls the weapon and takes priority. Otherwise the standalone profile controls receiver settings.
+- Changing rooms resets weapon equipment. Receiver settings do not equip, hide or modify a developer's weapon.
 
 ## Build
 
@@ -22,9 +22,9 @@ For another game location:
 & '.\mace mod\build.ps1' -GamePath 'D:\SteamLibrary\steamapps\common\Gorilla Tag'
 ```
 
-Output: `mace mod\artifacts\MaceMod.dll`. The build compiles all `shared/*.cs` and `src/*.cs` using the installed game's Unity and Photon assemblies, BepInEx 5 and Utilla. It does not copy anything into the game or launch it.
+Output: `mace mod\artifacts\MaceMod.dll`. The build compiles `shared/*.cs` and `src/*.cs` using the installed game's Unity and Photon assemblies, BepInEx 5 and Utilla. It does not copy anything into the game or launch it.
 
-This folder is independently buildable within this Totem workspace. It reuses `../src/PixelMeshBuilder.cs`, `../tests/PixelMeshTests.cs` and the workspace Utilla repair sources/build/tests under `../updater/utilla`, `../compat/utilla` and `../tests`. Keep this source checkout together. No reference to `TotemMod.dll` is required.
+This folder builds within the Totem source workspace. It reuses the public developer-identity verifier, `../src/PixelMeshBuilder.cs`, `../tests/PixelMeshTests.cs`, and the Utilla repair sources/build/tests under `../updater/utilla`, `../compat/utilla` and `../tests`. Keep the checkout together. The standalone plugin contains no developer signing private key and requires no reference to `TotemMod.dll`.
 
 ## Utilla compatibility
 
@@ -36,10 +36,10 @@ The DLL embeds the same validated Utilla compatibility repair used by Totem Mod.
 
 The mace is a closed extrusion of the original point-filtered pixel texture, straightened around its handle grip. Visual posing and hit detection use the same grip rotation and head center. There are no cosmetic colliders or cloned rig behaviours. Impacts reuse one mesh batch with at most 64 live critical-hit sparks, at most 16 per impact, and four pooled spatial audio voices.
 
-The optional enchantment shimmer uses opaque material tint/emission. The original glint and gust PNGs are retained with provenance for future work; the runtime currently renders the original mace and critical-hit sprites. It adds no transparent glint shell.
+The developer-controlled enchantment shimmer uses opaque material tint/emission. The original glint and gust PNGs are retained with provenance for future work; the runtime currently renders the original mace and critical-hit sprites. It adds no transparent glint shell.
 
 Minecraft assets belong to Mojang/Microsoft. These extracted copies and DLLs embedding them are for this local personal installation; do not redistribute them as part of a public source or release package.
 
 ## Verification
 
-The build runs offline extraction integrity tests, compiled render-safety and allocation checks, the shared solid-extrusion camera/culling/color tests against the actual mace PNG, and the protocol and enchantment-mechanics tests in `tests/`. Runtime visual alignment, controller behavior and multiplayer results still need testing in the real headset/game.
+The build runs offline extraction integrity tests, compiled receiver-access/render-safety/allocation checks, solid-extrusion camera/culling/color tests against the actual mace PNG, and protocol and enchantment-mechanics tests. Runtime visual alignment, developer authentication and multiplayer results still need testing in the real headset/game.

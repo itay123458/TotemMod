@@ -13,6 +13,8 @@ namespace MaceMod.Shared
         {
             internal string Owner;
             internal Func<bool> Allowed,Save;
+            internal Func<bool> AuthorizeEquip;
+            internal Func<byte[],byte[]> Sign;
             internal Action Commit;
             internal Action<string> Notice;
             internal int Density,Knockback,Wind;
@@ -53,16 +55,16 @@ namespace MaceMod.Shared
 
         internal MaceRuntime()
         {
-            transport=new MaceTransport(Allowed,ReceiveState,ReceiveHit,ReceiveReceipt,RemovePeer);
-            Bus["attach"]=new Func<string,Func<bool>,Func<bool>,Action<string>,Action,IDictionary<string,object>>(Attach);
+            transport=new MaceTransport(Allowed,ReceiveState,ReceiveHit,ReceiveReceipt,RemovePeer,SignState,TotemMod.DeveloperIdentity.Verify);
+            Bus["attach"]=new Func<string,Func<bool>,Func<bool>,Action<string>,Action,Func<bool>,Func<byte[],byte[]>,IDictionary<string,object>>(Attach);
         }
-        private IDictionary<string,object> Attach(string owner,Func<bool> allowed,Func<bool> save,Action<string> notice,Action commit)
+        private IDictionary<string,object> Attach(string owner,Func<bool> allowed,Func<bool> save,Action<string> notice,Action commit,Func<bool> authorizeEquip,Func<byte[],byte[]> sign)
         {
             string token=Guid.NewGuid().ToString("N");
-            Client client=new Client {Owner=owner,Allowed=allowed,Save=save,Notice=notice,Commit=commit}; clients.Add(token,client);
+            Client client=new Client {Owner=owner,Allowed=allowed,Save=save,Notice=notice,Commit=commit,AuthorizeEquip=authorizeEquip,Sign=sign}; clients.Add(token,client);
             return new Dictionary<string,object> {
                 {"configure",new Action<bool,int,int,int,float,bool,bool,bool,bool,float>((e,d,k,w,s,p,a,g,r,f)=>Configure(client,e,d,k,w,s,p,a,g,r,f))},
-                {"tick",new Action(Tick)},{"toggle",new Action(Toggle)},
+                {"tick",new Action(Tick)},{"toggle",new Action(()=>Toggle(client))},
                 {"equipped",new Func<bool>(()=>equipped)}, {"status",new Func<string>(Status)},
                 {"suspend",new Action<bool>(value=>client.Suspended=value)},
                 {"detach",new Action(()=>Detach(token))}
@@ -72,7 +74,6 @@ namespace MaceMod.Shared
         { return float.IsNaN(value)||float.IsInfinity(value) ? fallback : Mathf.Clamp(value,min,max); }
         private void Configure(Client client,bool equip,int density,int knockback,int wind,float scale,bool particles,bool sound,bool glint,bool receive,float power)
         {
-            equipped=equip;
             client.Density=Math.Max(0,Math.Min(5,density)); client.Knockback=Math.Max(0,Math.Min(2,knockback)); client.Wind=Math.Max(0,Math.Min(3,wind));
             client.Scale=Safe(scale,1,0.5f,1.5f); client.Power=Safe(power,1,0.25f,2);
             client.Particles=particles; client.Sound=sound; client.Glint=glint; client.Receive=receive;
@@ -104,9 +105,30 @@ namespace MaceMod.Shared
             result=message;
             Client client=Profile(); if(client!=null && client.Notice!=null) client.Notice(message);
         }
-        private void Toggle()
+        private bool EquipAuthorized(Client client)
         {
-            if(!Allowed() || toggleFrame==Time.frameCount) return;
+            try { return client!=null && client.Owner=="totem-dev" && Active(client) && client.AuthorizeEquip!=null && client.AuthorizeEquip() && client.Sign!=null; }
+            catch { return false; }
+        }
+        private byte[] SignState(byte[] data)
+        {
+            foreach(Client client in clients.Values) if(EquipAuthorized(client)) return client.Sign(data);
+            return null;
+        }
+        private void ClearUnauthorized()
+        {
+            if(!equipped) return;
+            foreach(Client client in clients.Values) if(EquipAuthorized(client)) return;
+            equipped=false; Hide(); hadTip=false;
+        }
+        private void Toggle(Client client)
+        {
+            if(!EquipAuthorized(client) || !Allowed() || toggleFrame==Time.frameCount) return;
+            if(!equipped)
+            {
+                byte[] probe=System.Text.Encoding.UTF8.GetBytes("TotemMaceDev/menu-equip/v2");
+                if(!TotemMod.DeveloperIdentity.Verify(probe,client.Sign(probe))) { Say("Developer signing key unavailable"); return; }
+            }
             toggleFrame=Time.frameCount; equipped=!equipped;
             Say(equipped ? "Mace equipped" : "Mace unequipped");
         }
@@ -122,6 +144,7 @@ namespace MaceMod.Shared
             if(disposed || frame==Time.frameCount) return;
             frame=Time.frameCount;
             if(!Allowed()) { Reset(); transport.Reset(); return; }
+            ClearUnauthorized();
             if(room!=PhotonNetwork.CurrentRoom || masterActor!=PhotonNetwork.CurrentRoom.MasterClientId)
             { Reset(); transport.Reset(); room=PhotonNetwork.CurrentRoom; masterActor=room.MasterClientId; session=Guid.NewGuid().ToString("N"); }
             Client profile=Profile();
@@ -253,7 +276,7 @@ namespace MaceMod.Shared
             if((rig.transform.position-body).sqrMagnitude>Mathf.Pow(Mathf.Min(4.5f,3.2f*size),2) || (point-body).sqrMagnitude>Mathf.Pow(0.85f*targetSize,2) ||
                 Blocked(point,body,GTPlayer.Instance) || Blocked(rig.transform.position,point,GTPlayer.Instance)) return false;
             bool near=false;
-            if(senderPlayer.IsLocal) near=(point-MaceVisuals.HeadPosition(rig.rightHandTransform,state.Scale)).sqrMagnitude<0.64f*size*size;
+            if(senderPlayer.IsLocal) near=outbound==hit && PhotonNetwork.Time-hit.Time<=0.55;
             else for(int i=0;i<source.Count;i++)
             {
                 int previous=(i+source.Tips.Length-1)%source.Tips.Length;
@@ -308,13 +331,13 @@ namespace MaceMod.Shared
             if(hit==null || hit.Sequence!=receipt.Sequence || hit.TargetActor!=targetActor || hit.SourceSession!=receipt.SourceSession || hit.TargetSession!=receipt.TargetSession) return;
             if(source!=null && source.Resolved>=hit.Sequence) return;
             if(source!=null) source.Resolved=hit.Sequence;
-            if(receipt.Outcome==3 && PhotonNetwork.IsMasterClient && NetworkSystem.Instance!=null && NetworkSystem.Instance.IsMasterClient)
+            if(receipt.Outcome==3 && receipt.SourceActor==PhotonNetwork.LocalPlayer.ActorNumber && NetworkSystem.Instance!=null)
             {
                 Peer ignored; float blocks;
                 if(Validate(receipt.SourceActor,hit,out ignored,out blocks) && Tagged(room.GetPlayer(receipt.SourceActor)) && !Tagged(room.GetPlayer(targetActor)))
                 {
-                    NetPlayer attacker=NetPlayer.Get(room.GetPlayer(receipt.SourceActor)),victim=NetPlayer.Get(room.GetPlayer(targetActor));
-                    ((GorillaTagManager)GorillaGameManager.instance).ReportTag(victim,attacker);
+                    NetPlayer victim=NetPlayer.Get(room.GetPlayer(targetActor));
+                    GorillaGameModes.GameMode.ReportTag(victim);
                 }
             }
             if(receipt.SourceActor==PhotonNetwork.LocalPlayer.ActorNumber && windSequence<hit.Sequence)

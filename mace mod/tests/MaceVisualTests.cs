@@ -13,6 +13,36 @@ internal static class MaceVisualTests
     { foreach(FieldDefinition field in type.Fields) if(field.Name==name) return Convert.ToInt32(field.Constant); throw new Exception("Missing "+name); }
     private static bool Calls(MethodDefinition method,string name)
     { foreach(Instruction instruction in method.Body.Instructions) { MethodReference called=instruction.Operand as MethodReference; if(called!=null&&called.Name==name) return true; } return false; }
+    private static void ReceiverOnly(TypeDefinition plugin)
+    {
+        foreach(MethodDefinition method in plugin.Methods)
+        {
+            Check(method.Name!="BDown" && method.Name!="Toggle" && method.Name!="IntSlider" && method.Name!="FloatSlider",
+                "Standalone must expose receiver settings only; found "+method.Name);
+            if(!method.HasBody) continue;
+            foreach(Instruction instruction in method.Body.Instructions)
+            {
+                MethodReference called=instruction.Operand as MethodReference;
+                Check(called==null || called.DeclaringType.FullName!="MaceMod.Shared.MaceClient" || called.Name!="Toggle",
+                    "Standalone must never request mace equipment");
+                string text=instruction.Operand as string;
+                Check(text!="KeyboardM" && text!="Equip mace" && text!="Unequip mace",
+                    "Standalone contains a desktop equipment route: "+text);
+                if(text=="ReceiveHits")
+                    Check(instruction.Next!=null && instruction.Next.OpCode==OpCodes.Ldc_I4_1,
+                        "Standalone incoming hits should default enabled");
+            }
+        }
+        foreach(FieldDefinition field in plugin.Fields)
+            Check(field.Name!="keyboard" && field.Name!="density" && field.Name!="knockback" && field.Name!="windBurst" && field.Name!="scale" && field.Name!="power" && field.Name!="glint",
+                "Standalone must not retain developer weapon controls: "+field.Name);
+        bool version=false;
+        foreach(CustomAttribute attribute in plugin.CustomAttributes)
+            if(attribute.AttributeType.FullName=="BepInEx.BepInPlugin" && attribute.ConstructorArguments.Count==3 && (string)attribute.ConstructorArguments[2].Value=="1.0.1") version=true;
+        Check(version,"Receiver-only plugin must declare version 1.0.1");
+        Check(Calls(Method(plugin,"Configure"),"Configure"),"Standalone must keep publishing receiver consent and effects");
+        Check(Calls(Method(plugin,"Update"),"Tick"),"Standalone must keep the receiver runtime ticking");
+    }
     private static int Main(string[] args)
     {
         try
@@ -23,6 +53,7 @@ internal static class MaceVisualTests
                 Check(visuals!=null,"Missing mace render class");
                 TypeDefinition plugin=assembly.MainModule.GetType("MaceMod.MacePlugin");
                 Check(plugin!=null,"Missing standalone plugin");
+                ReceiverOnly(plugin);
                 Check(Calls(Method(plugin,"OnDisable"),"DisconnectClient"),"Disabling standalone must release the runtime client");
                 Check(Calls(Method(plugin,"DisconnectClient"),"Dispose"),"Disconnect must dispose runtime ownership");
                 Check(Calls(Method(plugin,"OnEnable"),"ConnectClient"),"Re-enabling standalone must reconnect runtime ownership");
