@@ -7,3 +7,5 @@ artifacts/
 *.pfx
 *.pem
 *.key
+__pycache__/
+*.py[cod]

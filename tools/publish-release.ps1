@@ -37,7 +37,14 @@ foreach ($releaseDirectory in @('src','tests','updater','tools','third_party')) 
 $releaseMaceSource=Join-Path $releaseRepo 'mace mod'
 $null=[IO.Directory]::CreateDirectory($releaseMaceSource)
 foreach ($releaseDirectory in @('shared','src','tools','tests')) {
-    Copy-Item -LiteralPath (Join-Path $releaseRoot ('mace mod\'+$releaseDirectory)) -Destination (Join-Path $releaseMaceSource $releaseDirectory) -Recurse
+    $releaseSourceDirectory=Join-Path $releaseRoot ('mace mod\'+$releaseDirectory)
+    $releaseDestinationDirectory=Join-Path $releaseMaceSource $releaseDirectory
+    foreach ($releaseSourceFile in (Get-ChildItem -LiteralPath $releaseSourceDirectory -Recurse -File | Where-Object { $_.Extension -in '.cs','.py','.ps1','.md','.txt' })) {
+        $releaseRelative=$releaseSourceFile.FullName.Substring($releaseSourceDirectory.Length+1)
+        $releaseDestination=Join-Path $releaseDestinationDirectory $releaseRelative
+        $null=[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($releaseDestination))
+        Copy-Item -LiteralPath $releaseSourceFile.FullName -Destination $releaseDestination
+    }
 }
 foreach ($releaseFile in @('build.ps1','README.md','INSTALL.txt')) {
     Copy-Item -LiteralPath (Join-Path $releaseRoot ('mace mod\'+$releaseFile)) -Destination (Join-Path $releaseMaceSource $releaseFile)
@@ -51,7 +58,7 @@ Copy-Item -LiteralPath $releaseHelper -Destination (Join-Path $releasePackage 'B
 Copy-Item -LiteralPath $releaseUtillaFix -Destination (Join-Path $releasePackage 'BepInEx\patchers\TotemMod.UtillaFix.dll')
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'README.md') -Destination (Join-Path $releasePackage 'README.md')
 Copy-Item -LiteralPath (Join-Path $releaseRepo 'LICENSE') -Destination (Join-Path $releasePackage 'LICENSE')
-$releaseUnexpected=@(Get-ChildItem -LiteralPath $releaseRepo -Recurse -File | Where-Object { $_.Extension -in '.dll','.exe','.pfx','.pem','.key','.cfg' })
+$releaseUnexpected=@(Get-ChildItem -LiteralPath $releaseRepo -Recurse -File | Where-Object { $_.Extension -in '.dll','.exe','.pfx','.pem','.key','.cfg','.pyc' })
 if ($releaseUnexpected.Count -gt 0) { throw ('Unexpected binary or private configuration in source package: '+$releaseUnexpected[0].FullName) }
 foreach ($releaseTextFile in (Get-ChildItem -LiteralPath $releaseRepo -Recurse -File | Where-Object { $_.Extension -in '.cs','.ps1','.py','.md','.json','.txt','.yml','.yaml' })) {
     $releaseText=[IO.File]::ReadAllText($releaseTextFile.FullName)
