@@ -63,6 +63,7 @@ if (-not $Publish) { Write-Output 'Nothing uploaded. Use the prepared repository
 
 & git -C $releaseRepo init -b main
 if ($LASTEXITCODE -ne 0) { throw 'Git init failed.' }
+& git -C $releaseRepo config core.autocrlf false
 $releasePreviousPreference=$ErrorActionPreference
 try {
     $ErrorActionPreference='Continue'
@@ -82,7 +83,7 @@ if ($LASTEXITCODE -ne 0) { throw 'GitHub account lookup failed.' }
 & git -C $releaseRepo config user.name itay123458
 & git -C $releaseRepo config user.email ($releaseAccountId+'+itay123458@users.noreply.github.com')
 & git -C $releaseRepo add -A -- src tests updater tools third_party compat build.ps1 README.md LICENSE .gitignore
-& git -C $releaseRepo commit -m ('Release Totem Mod '+$releaseVersion)
+& git -C $releaseRepo commit --quiet -m ('Release Totem Mod '+$releaseVersion)
 if ($LASTEXITCODE -ne 0) { throw 'Git commit failed.' }
 if ($releaseRepositoryExists) { & git -C $releaseRepo push origin main }
 else { & gh repo create itay123458/TotemMod --public --description 'Gorilla Tag Totem Mod: presets, VR settings, Beta avatar totems and signed automatic updates.' --source $releaseRepo --remote origin --push }

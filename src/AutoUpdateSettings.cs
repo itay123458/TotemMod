@@ -11,7 +11,7 @@ namespace TotemMod
 {
     public sealed partial class TotemPlugin
     {
-        internal const string ModVersion="1.7.1";
+        internal const string ModVersion="1.7.2";
         private ConfigEntry<bool> automaticUpdates;
         private ConfigEntry<float> updateIntervalMinutes;
         private Task<UpdateResult> updateTask;
@@ -86,6 +86,7 @@ namespace TotemMod
                 try { result=updateTask.Result; }
                 catch (Exception) { result=new UpdateResult {Status="Update check failed; installed version retained"}; }
                 updateTask=null; updateStatus=result.Status;
+                if (result.Status.StartsWith("Check failed:",StringComparison.Ordinal)) updateCheckAt=Time.unscaledTime+300;
                 if (result.ClearPending) { pendingUpdate=null; updateToast=false; }
                 if (result.Version!=null) { pendingUpdate=result.Version; updateToast=true; }
                 Log.LogInfo("Totem updater: "+updateStatus);

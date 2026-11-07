@@ -44,18 +44,21 @@ namespace TotemMod.Updating
             ValidateAddress(address);
             // Preserve OS defaults; older Framework/Mono defaults need TLS 1.2 enabled.
             SecurityProtocolType protocols = ServicePointManager.SecurityProtocol;
-            if (protocols != 0 && (protocols & (SecurityProtocolType)3072) == 0)
-                ServicePointManager.SecurityProtocol = protocols | (SecurityProtocolType)3072;
+            if (protocols != 0)
+                ServicePointManager.SecurityProtocol = (protocols & ~(SecurityProtocolType)48) | (SecurityProtocolType)3072;
             Uri current = address;
+            int totalTimeout=maximumBytes>UpdateTrust.MaximumManifestBytes ? 60000 : 15000;
             Stopwatch elapsed=Stopwatch.StartNew();
             for (int redirects = 0; redirects <= 5; redirects++)
             {
                 ValidateAddress(current);
-                int remaining=15000-(int)Math.Min(elapsed.ElapsedMilliseconds,15000L);
+                int remaining=totalTimeout-(int)Math.Min(elapsed.ElapsedMilliseconds,(long)totalTimeout);
                 if (remaining<=0) throw new WebException("The update download timed out.",WebExceptionStatus.Timeout);
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(current);
                 request.Method = "GET";
                 request.AllowAutoRedirect = false;
+                // Update checks are infrequent; release each redirect connection.
+                request.KeepAlive = false;
                 request.Timeout = remaining;
                 request.ReadWriteTimeout = remaining;
                 request.AutomaticDecompression = DecompressionMethods.None;
@@ -63,10 +66,16 @@ namespace TotemMod.Updating
                 request.Credentials = null;
                 request.Proxy = null;
                 request.UserAgent = "TotemMod-Updater/1";
+#if UPDATER_TRACE
+                Console.WriteLine("GET "+current.DnsSafeHost+current.AbsolutePath);
+#endif
                 using (Timer deadline=new Timer(delegate(object ignored) { request.Abort(); },null,remaining,Timeout.Infinite))
                 using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
                 {
                     int status = (int)response.StatusCode;
+#if UPDATER_TRACE
+                    Console.WriteLine("HTTP "+status+" length "+response.ContentLength);
+#endif
                     if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308)
                     {
                         string location = response.Headers[HttpResponseHeader.Location];
@@ -92,6 +101,9 @@ namespace TotemMod.Updating
                             if (output.Length + count > maximumBytes)
                                 throw new InvalidDataException("The update download exceeds its permitted size.");
                             output.Write(buffer, 0, count);
+#if UPDATER_TRACE
+                            if (output.Length==count || output.Length==response.ContentLength) Console.WriteLine("Read "+output.Length+" bytes");
+#endif
                         }
                         if (response.ContentLength >= 0 && output.Length != response.ContentLength)
                             throw new InvalidDataException("The update download ended before its declared length.");

@@ -23,7 +23,13 @@ internal static class LiveUpdateProbe
             string hash;
             using (System.Security.Cryptography.SHA256 sha=System.Security.Cryptography.SHA256.Create())
             using (FileStream input=File.OpenRead(args[1])) hash=BitConverter.ToString(sha.ComputeHash(input)).Replace("-","");
-            UpdateDownload update=new UpdateClient().Fetch(installed,hash);
+            UpdateClient client=new UpdateClient((uri,limit) => {
+                Console.WriteLine("Fetching "+uri.Host+uri.AbsolutePath);
+                System.Diagnostics.Stopwatch timer=System.Diagnostics.Stopwatch.StartNew();
+                byte[] bytes=UpdateClient.FetchBytes(uri,limit);
+                Console.WriteLine("Fetched "+bytes.Length+" bytes in "+timer.ElapsedMilliseconds+"ms"); return bytes;
+            });
+            UpdateDownload update=client.Fetch(installed,hash);
             if (update==null) { Console.WriteLine("Live feed verified: installed version is already current."); return 0; }
             string bepin=Path.Combine(root,"BepInEx"),plugins=Path.Combine(bepin,"plugins");
             Directory.CreateDirectory(plugins);

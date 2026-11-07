@@ -1,6 +1,6 @@
 # Totem Mod
 
-Version **1.7.1**, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.7.2**, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
@@ -75,7 +75,7 @@ The creator/host needs patched Utilla and a **new private Modded Infection room*
 
 ## Automatic updates
 
-Automatic updates are on by default. The plugin checks the public GitHub release feed shortly after startup, then every six hours by default. Configure it under **Interface / Updates**, or check manually there. No GitHub login is needed to receive updates.
+Automatic updates are on by default. The plugin checks the public GitHub release feed shortly after startup, then every six hours by default. Failed checks retry after five minutes. Configure it under **Interface / Updates**, or check manually there. No GitHub login is needed to receive updates.
 
 New versions must have a valid publisher RSA signature, exact DLL hash/size, expected plugin identity/version and matching tested game build. Downloads are bounded and HTTPS-only. The runtime stages verified files without replacing its loaded DLL. At the next game launch, the preloader helper checks them again and atomically installs the new plugin before plugin loading, keeping the old DLL in `BepInEx/cache/TotemModUpdater/backups/`.
 
