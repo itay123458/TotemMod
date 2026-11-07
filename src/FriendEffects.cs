@@ -58,13 +58,16 @@ namespace TotemMod
 
         private static Transform GetFriendHand(int actor, FriendTotem friend)
         {
+            if (friend.CachedHand!=null && Time.unscaledTime<friend.HandLookupAt) return friend.CachedHand;
+            friend.HandLookupAt=Time.unscaledTime+0.5f;
             if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || GorillaGameManager.instance == null) return null;
             Player player = PhotonNetwork.CurrentRoom.GetPlayer(actor);
             if (player == null || player.IsLocal || player.IsInactive) return null;
             NetPlayer net = NetPlayer.Get(player);
             if (net == null || !net.IsValid) return null;
             VRRig rig = GorillaGameManager.instance.FindPlayerVRRig(net);
-            return rig != null ? friend.Palm.Resolve(rig.transform, rig.leftHandTransform) : null;
+            friend.CachedHand=rig != null ? friend.Palm.Resolve(rig.transform, rig.leftHandTransform) : null;
+            return friend.CachedHand;
         }
 
         private void ReceiveFriend(int actor, TotemSnapshot packet)
@@ -113,11 +116,20 @@ namespace TotemMod
             goneFriends.Clear();
             Transform viewer = GetHead();
             float range = SafeFloat(friendDistance.Value,20,5,50);
+            int avatars=0;
             foreach (KeyValuePair<int, FriendTotem> entry in friends)
             {
                 Player player = PhotonNetwork.CurrentRoom.GetPlayer(entry.Key);
                 FriendTotem friend = entry.Value;
                 if (player == null || player.IsInactive) { goneFriends.Add(entry.Key); continue; }
+                TotemSnapshot packet = friend.State.Snapshot;
+                if (packet==null || !packet.Equipped && friend.PendingPopUntil<=Time.unscaledTime)
+                {
+                    if (friend.Held!=null) UnityEngine.Object.Destroy(friend.Held);
+                    friend.Held=null; continue;
+                }
+                if (!showFriends.Value)
+                { if (friend.Held!=null) friend.Held.SetActive(false); friend.PendingPopUntil=0; continue; }
                 Transform hand = GetFriendHand(entry.Key, friend);
                 if (hand == null)
                 {
@@ -125,13 +137,18 @@ namespace TotemMod
                     friend.Held = null;
                     continue;
                 }
-                if (!showFriends.Value || (viewer != null && (hand.position-viewer.position).sqrMagnitude > range*range))
+                float distance=viewer!=null ? (hand.position-viewer.position).sqrMagnitude : 0;
+                if (distance > range*range)
                 {
                     if (friend.Held != null) friend.Held.SetActive(false);
                     friend.PendingPopUntil = 0;
                     continue;
                 }
-                TotemSnapshot packet = friend.State.Snapshot;
+                BetaAppearance appearance=FriendBeta(entry.Key,friend);
+                bool allowAvatar=appearance==null || appearance.Style!=BetaTotemVisuals.PlayerModel || avatars<3 && distance<=144;
+                if (appearance!=null && appearance.Style==BetaTotemVisuals.PlayerModel && allowAvatar) avatars++;
+                if (friend.Held!=null && (!SameVisual(friend.RenderAppearance,appearance) || friend.AvatarAllowed!=allowAvatar || friend.AvatarFallback && allowAvatar && Time.unscaledTime>=friend.NextBetaRetryAt))
+                { UnityEngine.Object.Destroy(friend.Held); friend.Held=null; }
                 bool used = friend.ConsumedSession == packet.Session && friend.ConsumedPops == packet.Pops;
                 if ((packet.Equipped && !used) || friend.PendingPopUntil > Time.unscaledTime)
                 {
@@ -139,13 +156,25 @@ namespace TotemMod
                     if (friend.PendingPopUntil > Time.unscaledTime)
                     {
                         friend.PendingPopUntil = 0f;
-                        if (fx.Value) StartCoroutine(PopAnimation(hand, false, packet.Size*SafeFloat(friendRenderScale.Value,1,0.5f,1.5f)));
+                        if (fx.Value) StartCoroutine(PopAnimation(hand, false, packet.Size*SafeFloat(friendRenderScale.Value,1,0.5f,1.5f),allowAvatar ? appearance : null,entry.Key));
                     }
                     if (packet.Equipped && !used)
                     {
-                        if (friend.Held == null) friend.Held = assets.Create(hand, "Friend Minecraft Totem");
+                        if (friend.Held == null)
+                        {
+                            friend.Held=CreateAppearanceVisual(hand,"Friend totem",appearance,entry.Key,allowAvatar);
+                            friend.RenderAppearance=appearance; friend.AvatarAllowed=allowAvatar;
+                            friend.TintTargets=friend.Held.GetComponentsInChildren<Renderer>();
+                            friend.AvatarFallback=appearance!=null && appearance.Style==BetaTotemVisuals.PlayerModel && friend.Held.GetComponent<BetaTotemVisualOwner>()==null;
+                            friend.NextBetaRetryAt=Time.unscaledTime+2;
+                        }
                         if (!friend.Held.activeSelf) friend.Held.SetActive(true);
                         PositionHeld(friend.Held, hand, packet.Size*SafeFloat(friendRenderScale.Value,1,0.5f,1.5f));
+                        if (appearance!=null)
+                        {
+                            ApplyAppearanceHeld(friend.Held,appearance);
+                            if (Time.unscaledTime>=friend.NextTintAt) { ApplyAppearanceTint(friend.Held,friend.TintTargets,appearance); friend.NextTintAt=Time.unscaledTime+0.1f; }
+                        }
                     }
                 }
             }

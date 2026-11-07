@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
@@ -31,7 +30,7 @@ namespace TotemMod
                 throw new InvalidDataException("Unable to decode the totem texture.");
             texture.filterMode = FilterMode.Point;
             texture.wrapMode = TextureWrapMode.Clamp;
-            Shader shader = Shader.Find("Unlit/Texture") ?? Shader.Find("Sprites/Default") ?? Shader.Find("Standard");
+            Shader shader = Shader.Find("Unlit/Texture") ?? Shader.Find("Standard");
             if (shader == null) throw new InvalidOperationException("No compatible totem shader is available.");
             Material = new Material(shader);
             Material.name = "Totem pixel material";
@@ -59,51 +58,28 @@ namespace TotemMod
             return go;
         }
 
-        // One combined mesh: opaque pixels have front/back faces and exposed edges.
-        // This preserves Minecraft's exact silhouette from both eyes and both sides.
+        // One shared, closed mesh. Merged cap UVs preserve the exact texture;
+        // exposed edges keep the source pixel's color and outward winding.
         private static Mesh BuildMesh(Texture2D image)
         {
             int width = image.width, height = image.height;
             Color32[] pixels = image.GetPixels32();
-            List<Vector3> vertices = new List<Vector3>();
-            List<Vector2> uvs = new List<Vector2>();
-            List<int> triangles = new List<int>();
-            float step = 0.30f / height;
-            float depth = step * 0.7f;
-            for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++)
-            {
-                if (pixels[y * width + x].a < 128) continue;
-                float l = (x - width * 0.5f) * step, r = l + step;
-                float b = (y - height * 0.5f) * step, t = b + step;
-                Vector2 uv = new Vector2((x + 0.5f) / width, (y + 0.5f) / height);
-                AddFace(vertices, uvs, triangles, uv, new Vector3(l,b,-depth), new Vector3(l,t,-depth), new Vector3(r,t,-depth), new Vector3(r,b,-depth));
-                AddFace(vertices, uvs, triangles, uv, new Vector3(r,b,depth), new Vector3(r,t,depth), new Vector3(l,t,depth), new Vector3(l,b,depth));
-                if (x == 0 || pixels[y*width+x-1].a < 128)
-                    AddFace(vertices, uvs, triangles, uv, new Vector3(l,b,depth), new Vector3(l,t,depth), new Vector3(l,t,-depth), new Vector3(l,b,-depth));
-                if (x == width-1 || pixels[y*width+x+1].a < 128)
-                    AddFace(vertices, uvs, triangles, uv, new Vector3(r,b,-depth), new Vector3(r,t,-depth), new Vector3(r,t,depth), new Vector3(r,b,depth));
-                if (y == 0 || pixels[(y-1)*width+x].a < 128)
-                    AddFace(vertices, uvs, triangles, uv, new Vector3(l,b,depth), new Vector3(l,b,-depth), new Vector3(r,b,-depth), new Vector3(r,b,depth));
-                if (y == height-1 || pixels[(y+1)*width+x].a < 128)
-                    AddFace(vertices, uvs, triangles, uv, new Vector3(l,t,-depth), new Vector3(l,t,depth), new Vector3(r,t,depth), new Vector3(r,t,-depth));
-            }
+            byte[] alpha = new byte[pixels.Length];
+            for (int i = 0; i < pixels.Length; i++) alpha[i] = pixels[i].a;
+            PixelMeshData data = PixelMeshBuilder.Build(alpha,width,height,0.30f,0.7f);
+            Vector3[] vertices = new Vector3[data.Positions.Length];
+            Vector2[] uvs = new Vector2[data.Uvs.Length];
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i] = new Vector3(data.Positions[i].X,data.Positions[i].Y,data.Positions[i].Z);
+            for (int i = 0; i < uvs.Length; i++) uvs[i] = new Vector2(data.Uvs[i].U,data.Uvs[i].V);
             Mesh mesh = new Mesh();
             mesh.name = "Extruded Minecraft totem pixels";
-            mesh.SetVertices(vertices);
-            mesh.SetUVs(0, uvs);
-            mesh.SetTriangles(triangles, 0);
+            mesh.vertices = vertices;
+            mesh.uv = uvs;
+            mesh.triangles = data.Triangles;
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
-        }
-
-        private static void AddFace(List<Vector3> v, List<Vector2> uv, List<int> ix, Vector2 color, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
-        {
-            int n = v.Count;
-            v.Add(a); v.Add(b); v.Add(c); v.Add(d);
-            for (int i = 0; i < 4; i++) uv.Add(color);
-            ix.Add(n); ix.Add(n+1); ix.Add(n+2); ix.Add(n); ix.Add(n+2); ix.Add(n+3);
         }
 
         public void Dispose()

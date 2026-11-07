@@ -13,15 +13,16 @@ namespace TotemMod
         public const int Crystal = 2;
         public const int Block = 3;
         public const int Star = 4;
-        private const int RendererLimit = 6;
-        private const int VertexLimit = 100000;
-        private const float SnapshotSeconds = 3f;
+        private const int RendererLimit = 3;
+        private const int VertexLimit = 30000;
+        private const int CacheLimit = 4;
+        private const float SnapshotSeconds = 10f;
+        private const float CaptureInterval = 0.1f;
         private const float ModelSize = 0.22f;
         private readonly Dictionary<int, Snapshot> cache = new Dictionary<int, Snapshot>();
         private readonly Dictionary<int, Snapshot> shapes = new Dictionary<int, Snapshot>();
         private readonly HashSet<GameObject> instances = new HashSet<GameObject>();
-        private int unavailableSource;
-        private float retryAt;
+        private float nextCaptureAt;
         private bool disposed;
 
         public GameObject Create(Transform parent, string name, VRRig source, int style, Color tint, bool usePlayerColor)
@@ -55,6 +56,8 @@ namespace TotemMod
                     else
                     {
                         MaterialPropertyBlock colors = new MaterialPropertyBlock();
+                        renderer.SetPropertyBlock(part.Properties);
+                        renderer.GetPropertyBlock(colors);
                         colors.SetColor("_Color", tint);
                         colors.SetColor("_BaseColor", tint);
                         renderer.SetPropertyBlock(colors);
@@ -73,20 +76,45 @@ namespace TotemMod
         {
             if (source == null) return null;
             int key = source.GetInstanceID();
-            if (key == unavailableSource && Time.unscaledTime < retryAt) return null;
+            float now = Time.unscaledTime;
             Snapshot existing;
             if (cache.TryGetValue(key, out existing))
             {
-                if (existing.Source == source && Time.unscaledTime - existing.CreatedAt < SnapshotSeconds) return existing;
+                // Reusing an active source does not rebake its pose every few
+                // seconds. Refresh is explicit, or after ten seconds unused.
+                if (existing.Source == source && now - existing.LastUsedAt < SnapshotSeconds)
+                {
+                    if (existing.Parts.Count != 0) existing.LastUsedAt = now;
+                    return existing.Parts.Count == 0 ? null : existing;
+                }
                 cache.Remove(key);
                 existing.Release();
             }
-            // Only one selected avatar is retained by the cache. Live effects
-            // retain their own reference until their visual is destroyed.
-            ClearCache();
+            // A burst of new peers cannot all invoke BakeMesh in one frame.
+            // The caller displays the classic visual and retries later.
+            if (now < nextCaptureAt) return null;
+            nextCaptureAt = now + CaptureInterval;
+            // Bound cached render data without evicting every other player.
+            // Effects retain references, so LRU eviction cannot destroy a live
+            // miniature's meshes or materials.
+            if (cache.Count >= CacheLimit)
+            {
+                int oldestKey = 0;
+                float oldestUse = float.PositiveInfinity;
+                foreach (KeyValuePair<int, Snapshot> entry in cache)
+                    if (entry.Value.LastUsedAt < oldestUse)
+                    { oldestKey = entry.Key; oldestUse = entry.Value.LastUsedAt; }
+                existing = cache[oldestKey];
+                cache.Remove(oldestKey);
+                existing.Release();
+            }
             Snapshot captured = Capture(source);
-            if (captured != null) cache.Add(key, captured);
-            else { unavailableSource = key; retryAt = Time.unscaledTime + SnapshotSeconds; }
+            // Cache failures too: unsupported body meshes must not be baked
+            // repeatedly when other players' visuals are created in between.
+            Snapshot entrySnapshot = captured ?? new Snapshot();
+            entrySnapshot.Source = source;
+            entrySnapshot.LastUsedAt = now;
+            cache.Add(key, entrySnapshot);
             return captured;
         }
 
@@ -94,7 +122,6 @@ namespace TotemMod
         {
             Snapshot snapshot = new Snapshot();
             snapshot.Source = source;
-            snapshot.CreatedAt = Time.unscaledTime;
             try
             {
                 int vertices = 0;
@@ -102,8 +129,8 @@ namespace TotemMod
                 // those renderers directly without changing their active state,
                 // and reserve the renderer budget for them before cosmetics.
                 SkinnedMeshRenderer body = source.mainSkin;
-                if (body != null)
-                    CapturePart(snapshot, source.transform, body, body.sharedMesh, ref vertices, true);
+                if (body == null || !CapturePart(snapshot, source.transform, body, body.sharedMesh, ref vertices, true, true))
+                { snapshot.Release(); return null; }
                 MeshRenderer face = source.faceSkin;
                 if (face != null)
                 {
@@ -111,12 +138,13 @@ namespace TotemMod
                     if (faceFilter != null)
                         CapturePart(snapshot, source.transform, face, faceFilter.sharedMesh, ref vertices, true);
                 }
+                int cosmeticLimit = Mathf.Min(RendererLimit, snapshot.Parts.Count + 1);
                 SkinnedMeshRenderer[] skins = source.GetComponentsInChildren<SkinnedMeshRenderer>(false);
-                for (int i = 0; i < skins.Length && snapshot.Parts.Count < RendererLimit; i++)
+                for (int i = 0; i < skins.Length && snapshot.Parts.Count < cosmeticLimit; i++)
                     if (skins[i] != body)
                         CapturePart(snapshot, source.transform, skins[i], skins[i].sharedMesh, ref vertices);
-                MeshRenderer[] solids = source.GetComponentsInChildren<MeshRenderer>(false);
-                for (int i = 0; i < solids.Length && snapshot.Parts.Count < RendererLimit; i++)
+                MeshRenderer[] solids = snapshot.Parts.Count < cosmeticLimit ? source.GetComponentsInChildren<MeshRenderer>(false) : new MeshRenderer[0];
+                for (int i = 0; i < solids.Length && snapshot.Parts.Count < cosmeticLimit; i++)
                 {
                     if (solids[i] == face) continue;
                     MeshFilter filter = solids[i].GetComponent<MeshFilter>();
@@ -141,11 +169,11 @@ namespace TotemMod
             catch { snapshot.Release(); return null; }
         }
 
-        private static void CapturePart(Snapshot snapshot, Transform root, Renderer renderer, Mesh source, ref int vertexCount, bool includeHidden = false)
+        private static bool CapturePart(Snapshot snapshot, Transform root, Renderer renderer, Mesh source, ref int vertexCount, bool includeHidden = false, bool closedBody = false)
         {
-            if (renderer.GetComponentInParent<TotemVisualMarker>()!=null || renderer.GetComponentInParent<BetaTotemVisualOwner>()!=null) return;
+            if (renderer.GetComponentInParent<TotemVisualMarker>()!=null || renderer.GetComponentInParent<BetaTotemVisualOwner>()!=null) return false;
             if (source == null || (!includeHidden && (!renderer.enabled || !renderer.gameObject.activeInHierarchy)) ||
-                source.vertexCount == 0 || source.vertexCount > VertexLimit - vertexCount) return;
+                source.vertexCount == 0 || source.vertexCount > VertexLimit - vertexCount || snapshot.Parts.Count >= RendererLimit) return false;
             Part part = new Part();
             try
             {
@@ -160,12 +188,21 @@ namespace TotemMod
                 part.Mesh.name = "Beta miniature avatar mesh";
                 Matrix4x4 matrix = root.worldToLocalMatrix * renderer.transform.localToWorldMatrix;
                 Vector3[] points = part.Mesh.vertices;
+                if (points.Length == 0 || points.Length > VertexLimit - vertexCount)
+                    throw new InvalidOperationException("Baked avatar mesh exceeds its vertex budget.");
                 for (int i = 0; i < points.Length; i++)
                 {
                     points[i] = matrix.MultiplyPoint3x4(points[i]);
                     if (!Finite(points[i])) throw new InvalidOperationException("Invalid avatar mesh bounds.");
                 }
                 part.Mesh.vertices = points;
+                if (matrix.determinant<0)
+                    for (int s=0;s<part.Mesh.subMeshCount;s++)
+                    {
+                        int[] indices=part.Mesh.GetTriangles(s);
+                        for (int j=0;j+2<indices.Length;j+=3) { int swap=indices[j+1]; indices[j+1]=indices[j+2]; indices[j+2]=swap; }
+                        part.Mesh.SetTriangles(indices,s);
+                    }
                 Vector3[] normals = part.Mesh.normals;
                 Matrix4x4 normalMatrix = matrix.inverse.transpose;
                 for (int i = 0; i < normals.Length; i++) normals[i] = normalMatrix.MultiplyVector(normals[i]).normalized;
@@ -179,18 +216,43 @@ namespace TotemMod
                 part.Mesh.tangents = tangents;
                 part.Mesh.RecalculateBounds();
                 Material[] originals = renderer.sharedMaterials;
-                if (originals.Length > 16) throw new InvalidOperationException("Too many avatar materials.");
+                if (originals.Length == 0 || originals.Length > 16) throw new InvalidOperationException("Unsupported avatar materials.");
                 part.Materials = new Material[originals.Length];
                 for (int i = 0; i < originals.Length; i++)
-                    if (originals[i] != null) part.Materials[i] = new Material(originals[i]);
+                    if (originals[i] != null) part.Materials[i] = CopyMaterial(originals[i], closedBody);
                 part.Properties = new MaterialPropertyBlock();
                 renderer.GetPropertyBlock(part.Properties);
                 snapshot.Parts.Add(part);
                 vertexCount += points.Length;
+                return true;
             }
             // Some cosmetics deliberately have unreadable meshes. Keep the
             // successful body capture and omit only that unsupported renderer.
-            catch { part.Dispose(); }
+            catch { part.Dispose(); return false; }
+        }
+
+        private static Material CopyMaterial(Material original, bool closedBody)
+        {
+            // Preserve game shaders and cosmetic cutouts. Only an explicitly
+            // transparent closed body needs an opaque material replacement.
+            bool transparent = original.renderQueue >= 3000 || original.GetTag("RenderType", false, "") == "Transparent";
+            Material result;
+            Shader opaque = closedBody && transparent ? Shader.Find("Standard") ?? Shader.Find("Unlit/Texture") : null;
+            if (opaque != null)
+            {
+                result = new Material(opaque);
+                if (original.HasProperty("_MainTex")) result.mainTexture = original.mainTexture;
+                Color color = original.HasProperty("_Color") ? original.color : Color.white;
+                color.a = 1f;
+                result.color = color;
+            }
+            else result = new Material(original);
+            if (closedBody && (!transparent || opaque != null))
+            {
+                if (result.HasProperty("_Cull")) result.SetInt("_Cull", (int)CullMode.Back);
+                if (result.HasProperty("_ZWrite")) result.SetInt("_ZWrite", 1);
+            }
+            return result;
         }
 
         private static bool Finite(Vector3 point)
@@ -204,7 +266,7 @@ namespace TotemMod
         {
             Snapshot result;
             if (shapes.TryGetValue(style, out result)) return result;
-            Shader shader = Shader.Find("Unlit/Color") ?? Shader.Find("Sprites/Default") ?? Shader.Find("Standard");
+            Shader shader = Shader.Find("Unlit/Color") ?? Shader.Find("Standard");
             if (shader == null) return null;
             result = new Snapshot();
             Part part = new Part();
@@ -213,6 +275,8 @@ namespace TotemMod
             part.Materials = new[] { new Material(shader) };
             part.Materials[0].name = "Beta totem shape color";
             part.Materials[0].color = Color.white;
+            if (part.Materials[0].HasProperty("_Cull")) part.Materials[0].SetInt("_Cull", (int)CullMode.Back);
+            if (part.Materials[0].HasProperty("_ZWrite")) part.Materials[0].SetInt("_ZWrite", 1);
             shapes.Add(style, result);
             return result;
         }
@@ -272,8 +336,7 @@ namespace TotemMod
         {
             foreach (Snapshot item in cache.Values) item.Release();
             cache.Clear();
-            unavailableSource = 0;
-            retryAt = 0;
+            nextCaptureAt = 0;
         }
 
         public void Dispose()
@@ -306,7 +369,7 @@ namespace TotemMod
         {
             public readonly List<Part> Parts = new List<Part>();
             public VRRig Source;
-            public float CreatedAt;
+            public float LastUsedAt;
             private int references = 1;
             public void Retain() { references++; }
             public void Release()

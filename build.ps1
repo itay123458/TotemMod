@@ -23,6 +23,13 @@ $taskSources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Fil
 $taskUpdaterCommon = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'updater\common') -Filter '*.cs' | ForEach-Object { $_.FullName })
 $taskSources += $taskUpdaterCommon
 $taskSources += @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'updater\runtime') -Filter '*.cs' | ForEach-Object { $_.FullName })
+& (Join-Path $PSScriptRoot 'updater\utilla\build.ps1') -GamePath $GamePath
+if ($LASTEXITCODE -ne 0) { throw 'Utilla repair helper build failed.' }
+$taskSources += (Join-Path $PSScriptRoot 'updater\utilla\UtillaRepairBootstrap.cs')
+$taskRepairResources = @(
+    ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.dll') + ',TotemMod.UtillaFix.dll'),
+    ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.sha256') + ',TotemMod.UtillaFix.sha256')
+)
 if (-not (Test-Path (Join-Path $PSScriptRoot 'assets\menu\click.pcm'))) {
     & python (Join-Path $PSScriptRoot 'tools\extract-menu-assets.py')
     if ($LASTEXITCODE -ne 0) { throw 'Local Minecraft menu asset extraction failed.' }
@@ -31,7 +38,7 @@ $taskMenuResources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'asse
 $taskDll = Join-Path $taskOutput 'TotemMod.dll'
 # Photon targets netstandard 2.0; this Unity installation supplies its compatible
 # netstandard 2.1 facade. Suppress only that legacy-csc identity warning.
-& $taskCsc /nologo /noconfig /nostdlib+ /target:library /optimize+ /warnaserror+ /nowarn:1701 /langversion:5 ("/out:" + $taskDll) @taskReferences ("/resource:" + (Join-Path $PSScriptRoot 'assets\totem.png') + ',TotemMod.totem.png') ("/resource:" + (Join-Path $PSScriptRoot 'assets\pop.pcm') + ',TotemMod.pop.pcm') ("/resource:" + (Join-Path $PSScriptRoot 'third_party\GorillaNotifications\gnotifications') + ',TotemMod.gnotifications') @taskMenuResources @taskSources
+& $taskCsc /nologo /noconfig /nostdlib+ /target:library /optimize+ /warnaserror+ /nowarn:1701 /langversion:5 ("/out:" + $taskDll) @taskReferences ("/resource:" + (Join-Path $PSScriptRoot 'assets\totem.png') + ',TotemMod.totem.png') ("/resource:" + (Join-Path $PSScriptRoot 'assets\pop.pcm') + ',TotemMod.pop.pcm') ("/resource:" + (Join-Path $PSScriptRoot 'third_party\GorillaNotifications\gnotifications') + ',TotemMod.gnotifications') @taskMenuResources @taskRepairResources @taskSources
 if ($LASTEXITCODE -ne 0) { throw 'Plugin compilation failed.' }
 $taskCecil = Join-Path $taskCore 'Mono.Cecil.dll'
 Copy-Item -LiteralPath $taskCecil -Destination $taskTests
@@ -111,6 +118,26 @@ $taskBetaTests = Join-Path $taskTests 'BetaVisualSafetyTests.exe'
 if ($LASTEXITCODE -ne 0) { throw 'Beta visual safety tests compilation failed.' }
 & $taskBetaTests $taskDll
 if ($LASTEXITCODE -ne 0) { throw 'Beta visual safety tests failed.' }
+$taskPixelTests=Join-Path $taskTests 'PixelMeshTests.exe'
+& $taskCsc /nologo /target:exe /langversion:5 /warnaserror+ ("/out:"+$taskPixelTests) '/reference:System.Drawing.dll' (Join-Path $PSScriptRoot 'src\PixelMeshBuilder.cs') (Join-Path $PSScriptRoot 'tests\PixelMeshTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Pixel mesh tests compilation failed.' }
+& $taskPixelTests (Join-Path $PSScriptRoot 'assets\totem.png')
+if ($LASTEXITCODE -ne 0) { throw 'Pixel mesh tests failed.' }
+$taskBatchTests=Join-Path $taskTests 'PopParticleBatchTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ ("/out:"+$taskBatchTests) ("/reference:"+$taskCecil) (Join-Path $PSScriptRoot 'tests\PopParticleBatchTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Particle batch tests compilation failed.' }
+& $taskBatchTests $taskDll
+if ($LASTEXITCODE -ne 0) { throw 'Particle batch tests failed.' }
+$taskBetaSyncTests=Join-Path $taskTests 'BetaSyncTests.exe'
+& $taskCsc /nologo /target:exe /langversion:5 /warnaserror+ ("/out:"+$taskBetaSyncTests) (Join-Path $PSScriptRoot 'src\BetaAppearance.cs') (Join-Path $PSScriptRoot 'src\BetaRoomSync.cs') (Join-Path $PSScriptRoot 'tests\BetaSyncTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Beta sync tests compilation failed.' }
+& $taskBetaSyncTests
+if ($LASTEXITCODE -ne 0) { throw 'Beta sync tests failed.' }
+$taskBetaAccountTests=Join-Path $taskTests 'BetaAccountAccessTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ ("/out:"+$taskBetaAccountTests) (Join-Path $PSScriptRoot 'src\BetaAccountAccess.cs') (Join-Path $PSScriptRoot 'tests\BetaAccountAccessTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Beta account tests compilation failed.' }
+& $taskBetaAccountTests
+if ($LASTEXITCODE -ne 0) { throw 'Beta account tests failed.' }
 $taskUpdaterDll=Join-Path $taskOutput 'TotemMod.Updater.dll'
 $taskUpdaterReferences=@(('/reference:'+(Join-Path $taskCore 'BepInEx.dll')),('/reference:'+$taskCecil),'/reference:System.Runtime.Serialization.dll')
 & $taskCsc /nologo /target:library /optimize+ /langversion:5 /warnaserror+ ("/out:"+$taskUpdaterDll) @taskUpdaterReferences @taskUpdaterCommon (Join-Path $PSScriptRoot 'updater\preloader\Preloader.cs')

@@ -30,6 +30,26 @@ internal static class BetaVisualSafetyTests
             {
                 TypeDefinition beta = assembly.MainModule.GetType("TotemMod.BetaTotemVisuals");
                 Check(beta != null, "Missing Beta renderer.");
+                Check(Constant(beta, "RendererLimit") <= 3, "Miniature avatars must use at most three renderers.");
+                Check(Constant(beta, "VertexLimit") <= 30000, "Miniature avatars must stay within the 30k vertex budget.");
+                Check(Constant(beta, "CacheLimit") <= 4 && Constant(beta, "CacheLimit") > 1,
+                    "Avatar snapshots must retain multiple sources with a four-entry memory bound.");
+                foreach (MethodDefinition method in beta.Methods)
+                    if (method.Name == "GetAvatar" && method.HasBody)
+                        foreach (Instruction instruction in method.Body.Instructions)
+                        {
+                            MethodReference called = instruction.Operand as MethodReference;
+                            Check(called == null || called.Name != "ClearCache", "Changing avatar source must not discard every cached snapshot.");
+                        }
+                TypeDefinition notice = assembly.MainModule.GetType("TotemMod.TotemNotice");
+                foreach (MethodDefinition method in notice.Methods)
+                    if (method.Name == "Tick" && method.HasBody)
+                        foreach (Instruction instruction in method.Body.Instructions)
+                        {
+                            MethodReference called = instruction.Operand as MethodReference;
+                            Check(called == null || (called.Name != "GetComponentsInChildren" && called.Name != "GetComponent"),
+                                "HUD Tick must reuse cached canvas and hierarchy references.");
+                        }
                 bool bakesMesh = false, hasOwner = false;
                 foreach (TypeDefinition top in assembly.MainModule.Types)
                 {
@@ -71,5 +91,12 @@ internal static class BetaVisualSafetyTests
             }
         }
         catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
+    }
+
+    private static int Constant(TypeDefinition type, string name)
+    {
+        foreach (FieldDefinition field in type.Fields)
+            if (field.Name == name && field.HasConstant) return Convert.ToInt32(field.Constant);
+        throw new InvalidOperationException("Missing resource budget: " + name);
     }
 }

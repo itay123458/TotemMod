@@ -36,17 +36,21 @@ namespace TotemMod
         private float sendCommandsAt;
         private string commandStatus = "Ready";
         private string commandAuthority;
+        private float developerCheckAt;
+        private bool developerCached;
 
         private bool IsDeveloper
         {
             get
             {
+                if (Time.unscaledTime<developerCheckAt) return developerCached;
+                developerCheckAt=Time.unscaledTime+0.5f;
                 try
                 {
-                    if (!SteamManager.Initialized) return false;
-                    return DeveloperAccess.Allows(Steamworks.SteamUser.GetSteamID().m_SteamID,true,Steamworks.SteamUser.BLoggedOn());
+                    developerCached=SteamManager.Initialized && DeveloperAccess.Allows(Steamworks.SteamUser.GetSteamID().m_SteamID,true,Steamworks.SteamUser.BLoggedOn());
                 }
-                catch (Exception) { return false; }
+                catch (Exception) { developerCached=false; }
+                return developerCached;
             }
         }
 
@@ -362,7 +366,8 @@ namespace TotemMod
         private void TickMenuInput()
         {
             bool developer = IsDeveloper;
-            if (menu != null && menuForDeveloper != developer) { menu.Dispose(); menu = null; }
+            bool beta=developer || HasBetaAccess;
+            if (menu != null && (menuForDeveloper != developer || betaMenuBefore!=beta)) { menu.Dispose(); menu = null; }
             bool trigger = SelectDown();
             bool toggleMenu = menuGesture.Update(RoomAllowed,MenuButtonDown(),Time.unscaledTime,menuHoldSeconds.Value) || (RoomAllowed && Pressed(KeyCode.F7));
             if (toggleMenu)
@@ -381,6 +386,7 @@ namespace TotemMod
                         }
                         menu = new TotemMenu(() => notice.LoadFont("Pixellari") ?? notice.LoadFont("JetBrainsMono-ExtraBold"),MenuStatus,MenuPages(),menuAssets.Skin);
                         menuForDeveloper = developer;
+                        betaMenuBefore=beta;
                     }
                     ApplyMenuSettings();
                     menu.Toggle(camera);

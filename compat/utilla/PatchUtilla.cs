@@ -170,17 +170,30 @@ internal static class PatchUtilla
     public static int Main(string[] args)
     {
         if (args.Length != 4) throw new Exception("Usage: PatchUtilla original payload output managedDirectory");
+        File.WriteAllBytes(args[2], Apply(File.ReadAllBytes(args[0]), File.ReadAllBytes(args[1]), args[3]));
+        return 0;
+    }
+
+    internal static byte[] Apply(byte[] originalBytes, byte[] payloadBytes, string managedDirectory)
+    {
+        lock (types)
+        {
+        try
+        {
+        types.Clear(); methods.Clear(); fields.Clear();
         string hash;
-        using (SHA256 sha = SHA256.Create()) hash = BitConverter.ToString(sha.ComputeHash(File.ReadAllBytes(args[0]))).Replace("-", "").ToLowerInvariant();
+        using (SHA256 sha = SHA256.Create()) hash = BitConverter.ToString(sha.ComputeHash(originalBytes)).Replace("-", "").ToLowerInvariant();
         if (hash != ExpectedSha) throw new Exception("Unsupported original Utilla digest: " + hash);
-        DefaultAssemblyResolver resolver = new DefaultAssemblyResolver();
-        resolver.AddSearchDirectory(args[3]);
-        resolver.AddSearchDirectory(Path.GetFullPath(Path.Combine(args[3], "..", "..", "BepInEx", "core")));
-        resolver.AddSearchDirectory(Path.GetDirectoryName(args[0]));
+        using (DefaultAssemblyResolver resolver = new DefaultAssemblyResolver())
+        {
+        resolver.AddSearchDirectory(managedDirectory);
+        resolver.AddSearchDirectory(Path.GetFullPath(Path.Combine(managedDirectory, "..", "..", "BepInEx", "core")));
         resolver.AddSearchDirectory(AppDomain.CurrentDomain.BaseDirectory);
         ReaderParameters options = new ReaderParameters { AssemblyResolver = resolver };
-        using (AssemblyDefinition original = AssemblyDefinition.ReadAssembly(args[0], options))
-        using (AssemblyDefinition payload = AssemblyDefinition.ReadAssembly(args[1], options))
+        using (MemoryStream originalStream = new MemoryStream(originalBytes, false))
+        using (MemoryStream payloadStream = new MemoryStream(payloadBytes, false))
+        using (AssemblyDefinition original = AssemblyDefinition.ReadAssembly(originalStream, options))
+        using (AssemblyDefinition payload = AssemblyDefinition.ReadAssembly(payloadStream, options))
         {
             target = original.MainModule;
             Merge(payload.MainModule);
@@ -188,8 +201,15 @@ internal static class PatchUtilla
             foreach (AssemblyNameReference unusedCore in target.AssemblyReferences.Where(a => a.Name == "mscorlib").ToArray())
                 target.AssemblyReferences.Remove(unusedCore);
             if (target.AssemblyReferences.Any(a => a.Name == payload.Name.Name)) throw new Exception("Payload dependency leaked");
-            original.Write(args[2]);
+            using (MemoryStream output = new MemoryStream())
+            {
+                original.Write(output);
+                return output.ToArray();
+            }
         }
-        return 0;
+        }
+        }
+        finally { target = null; types.Clear(); methods.Clear(); fields.Clear(); }
+        }
     }
 }

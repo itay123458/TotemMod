@@ -11,7 +11,7 @@ namespace TotemMod
 {
     public sealed partial class TotemPlugin
     {
-        internal const string ModVersion="1.7.2";
+        internal const string ModVersion="1.8.0";
         private ConfigEntry<bool> automaticUpdates;
         private ConfigEntry<float> updateIntervalMinutes;
         private Task<UpdateResult> updateTask;
@@ -20,6 +20,7 @@ namespace TotemMod
         private float updateCheckAt;
         private string updateStatus="Not checked",pendingUpdate;
         private string updaterRoot,updaterGameAssembly,updaterHelper;
+        private bool utillaRepairToast;
 
         private sealed class UpdateResult
         {
@@ -34,6 +35,16 @@ namespace TotemMod
             updaterRoot=Paths.BepInExRootPath;
             updaterGameAssembly=Path.Combine(Paths.ManagedPath,"Assembly-CSharp.dll");
             updaterHelper=Path.Combine(Paths.PatcherPluginPath,"TotemMod.Updater.dll");
+            try
+            {
+                string repairStatus=UtillaRepairBootstrap.EnsureInstalled(updaterRoot);
+                if (repairStatus!=null)
+                {
+                    Log.LogInfo(repairStatus);
+                    utillaRepairToast=repairStatus=="Utilla repair ready; restart Gorilla Tag";
+                }
+            }
+            catch (Exception error) { Log.LogWarning("Utilla repair setup: "+error.Message); }
             try
             {
                 pendingUpdate=UpdateInstaller.PendingVersion(updaterRoot);
@@ -79,6 +90,8 @@ namespace TotemMod
         private void TickAutoUpdater()
         {
             if (updaterDisposed) return;
+            if (utillaRepairToast && Allowed)
+            { ShowNotice("Utilla fix ready\nRestart Gorilla Tag to apply",false); utillaRepairToast=false; }
             if (updateTask!=null && updateTaskAutomatic && !automaticUpdates.Value) updateCancelled=true;
             if (updateTask!=null && updateTask.IsCompleted)
             {

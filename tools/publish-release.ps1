@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$GamePath='C:\Program Files (x86)\Steam\steamapps\common\Gorilla Tag',
+    [string]$NotesFile,
     [switch]$SkipBuild,
     [switch]$Publish
 )
@@ -10,6 +11,7 @@ if (-not $SkipBuild) { & (Join-Path $releaseRoot 'build.ps1') -GamePath $GamePat
 $releaseArtifacts=Join-Path $releaseRoot 'artifacts'
 $releaseDll=Join-Path $releaseArtifacts 'TotemMod.dll'
 $releaseHelper=Join-Path $releaseArtifacts 'TotemMod.Updater.dll'
+$releaseUtillaFix=Join-Path $releaseArtifacts 'TotemMod.UtillaFix.dll'
 $releaseKey=Join-Path $env:USERPROFILE '.totemmod\update-signing-private.xml'
 if (-not (Test-Path -LiteralPath $releaseKey)) { throw 'Publisher signing key is missing. It is not stored in the repository.' }
 $releaseManifest=Join-Path $releaseArtifacts 'totem-update.json'
@@ -37,6 +39,7 @@ foreach ($releaseFile in @('build.ps1','README.md','.gitignore')) { Copy-Item -L
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'third_party\GorillaNotifications\LICENSE') -Destination (Join-Path $releaseRepo 'LICENSE')
 Copy-Item -LiteralPath $releaseDll -Destination (Join-Path $releasePackage 'BepInEx\plugins\TotemMod.dll')
 Copy-Item -LiteralPath $releaseHelper -Destination (Join-Path $releasePackage 'BepInEx\patchers\TotemMod.Updater.dll')
+Copy-Item -LiteralPath $releaseUtillaFix -Destination (Join-Path $releasePackage 'BepInEx\patchers\TotemMod.UtillaFix.dll')
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'README.md') -Destination (Join-Path $releasePackage 'README.md')
 Copy-Item -LiteralPath (Join-Path $releaseRepo 'LICENSE') -Destination (Join-Path $releasePackage 'LICENSE')
 $releaseUnexpected=@(Get-ChildItem -LiteralPath $releaseRepo -Recurse -File | Where-Object { $_.Extension -in '.dll','.exe','.pfx','.pem','.key','.cfg' })
@@ -48,15 +51,16 @@ foreach ($releaseTextFile in (Get-ChildItem -LiteralPath $releaseRepo -Recurse -
 $releaseZip=Join-Path $releaseArtifacts ('TotemMod-'+$releaseVersion+'.zip')
 Compress-Archive -Path (Join-Path $releasePackage '*') -DestinationPath $releaseZip -Force
 $releaseNotes=Join-Path $releaseWork 'release-notes.md'
-@"
-Totem Mod $releaseVersion adds signed automatic updates from this repository.
+if ($NotesFile) { Copy-Item -LiteralPath $NotesFile -Destination $releaseNotes }
+else { @"
+Totem Mod $releaseVersion. Changes and controls are described in README.
 
 For the first install, extract TotemMod-$releaseVersion.zip into the Gorilla Tag folder while the game is closed. The ZIP installs the plugin and its updater helper; BepInEx and Utilla are required separately.
 
 The mod checks on startup and periodically, stages compatible signed updates, and installs them at the next game launch with a backup. Settings are under Interface / Updates. Developer keys and local configuration are not included.
 
 Source and GPL v2 license are in this repository at tag $releaseTag. Minecraft assets belong to Mojang/Microsoft; notification template attribution is in README.
-"@ | Set-Content -LiteralPath $releaseNotes -Encoding UTF8
+"@ | Set-Content -LiteralPath $releaseNotes -Encoding UTF8 }
 Write-Output ('Prepared signed release: '+$releaseZip)
 Write-Output ('Public source allowlist: '+$releaseRepo)
 if (-not $Publish) { Write-Output 'Nothing uploaded. Use the prepared repository and release files to publish.'; return }
@@ -88,6 +92,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Git commit failed.' }
 if ($releaseRepositoryExists) { & git -C $releaseRepo push origin main }
 else { & gh repo create itay123458/TotemMod --public --description 'Gorilla Tag Totem Mod: presets, VR settings, Beta avatar totems and signed automatic updates.' --source $releaseRepo --remote origin --push }
 if ($LASTEXITCODE -ne 0) { throw 'Repository creation or push failed. No release was published.' }
-& gh release create $releaseTag $releaseDll $releaseHelper $releaseManifest $releaseZip --repo itay123458/TotemMod --title ('Totem Mod '+$releaseVersion) --notes-file $releaseNotes --latest
+& gh release create $releaseTag $releaseDll $releaseHelper $releaseUtillaFix $releaseManifest $releaseZip --repo itay123458/TotemMod --title ('Totem Mod '+$releaseVersion) --notes-file $releaseNotes --latest
 if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
 Write-Output ('Published https://github.com/itay123458/TotemMod/releases/tag/'+$releaseTag)

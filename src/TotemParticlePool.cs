@@ -60,29 +60,18 @@ namespace TotemMod
 
         private static bool IsDestroyed(GameObject item) { return item == null; }
 
-        // Each lit cell is an opaque, double-sided quad. The silhouette stays
-        // pixel sharp without sampling a texture or lighting tiny 3D cubes.
+        // Merge solid runs into double-sided quads once for the entire pool.
         private static Mesh BuildPixels(string[] rows, string name)
         {
-            List<Vector3> vertices = new List<Vector3>();
-            List<int> triangles = new List<int>();
-            int height = rows.Length, width = rows[0].Length;
-            for (int y=0; y<height; y++)
-            for (int x=0; x<width; x++)
-            {
-                if (rows[y][x] != '#') continue;
-                float l = (float)x/width-0.5f, r = (float)(x+1)/width-0.5f;
-                float b = 0.5f-(float)(y+1)/height, t = 0.5f-(float)y/height;
-                int n = vertices.Count;
-                vertices.Add(new Vector3(l,b,0)); vertices.Add(new Vector3(l,t,0));
-                vertices.Add(new Vector3(r,t,0)); vertices.Add(new Vector3(r,b,0));
-                triangles.AddRange(new[] { n,n+1,n+2,n,n+2,n+3, n+2,n+1,n,n+3,n+2,n });
-            }
+            PixelMeshData data = PixelMeshBuilder.BuildBillboard(rows);
+            Vector3[] vertices = new Vector3[data.Positions.Length];
+            for (int i=0; i<vertices.Length; i++)
+                vertices[i] = new Vector3(data.Positions[i].X,data.Positions[i].Y,data.Positions[i].Z);
             Mesh result = new Mesh();
             result.name = name;
-            result.SetVertices(vertices);
-            result.SetTriangles(triangles,0);
-            Color32[] colors = new Color32[vertices.Count];
+            result.vertices = vertices;
+            result.triangles = data.Triangles;
+            Color32[] colors = new Color32[vertices.Length];
             for (int i=0; i<colors.Length; i++) colors[i] = new Color32(255,255,255,255);
             result.colors32 = colors;
             result.RecalculateNormals();

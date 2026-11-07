@@ -14,6 +14,11 @@ namespace TotemMod
         private GameObject root;
         private Text label;
         private CanvasGroup opacity;
+        private Canvas canvas;
+        private Transform rootTransform;
+        private Transform[] hierarchy;
+        private Camera attachedCamera;
+        private int assignedLayer = -1;
         private AssetBundle bundle;
         private Stream stream;
         private bool ownsBundle;
@@ -53,27 +58,40 @@ namespace TotemMod
             bool visibleMessage = message != null && ((empty && rechargeCountdown) || now < until);
             if (camera == null || !visibleMessage && string.IsNullOrEmpty(timer)) { Hide(); return; }
             if (root == null) Create();
-            root.transform.SetParent(camera.transform, false);
-            root.transform.localPosition = offset;
-            // Unity UI faces -Z: point +Z away from the eye along the offset.
-            root.transform.localRotation = Quaternion.LookRotation(offset, Vector3.up);
-            root.transform.localScale = Vector3.one * (0.001f * scale);
-            Canvas canvas = root.GetComponent<Canvas>();
-            canvas.worldCamera = camera;
+            bool cameraChanged = attachedCamera != camera;
+            if (cameraChanged)
+            {
+                rootTransform.SetParent(camera.transform, false);
+                canvas.worldCamera = camera;
+                attachedCamera = camera;
+            }
+            if (cameraChanged || rootTransform.localPosition != offset)
+            {
+                rootTransform.localPosition = offset;
+                // Unity UI faces -Z: point +Z away from the eye along the offset.
+                rootTransform.localRotation = Quaternion.LookRotation(offset, Vector3.up);
+            }
+            Vector3 localScale = Vector3.one * (0.001f * scale);
+            if (rootTransform.localScale != localScale) rootTransform.localScale = localScale;
             int layer = (int)UnityLayer.FirstPersonOnly;
             if ((camera.cullingMask & (1 << layer)) == 0)
             {
                 layer = 0;
                 for (int i=0; i<32; i++) if ((camera.cullingMask & (1 << i)) != 0) { layer=i; break; }
             }
-            foreach (Transform part in root.GetComponentsInChildren<Transform>(true)) part.gameObject.layer = layer;
+            if (assignedLayer != layer)
+            {
+                foreach (Transform part in hierarchy) part.gameObject.layer = layer;
+                assignedLayer = layer;
+            }
             string content = visibleMessage ? (empty && available == 0 && rechargeCountdown ? "Out of totems\nNext totem in " + seconds + "s" : message) : "";
             if (!string.IsNullOrEmpty(timer)) content += (content.Length > 0 ? "\n" : "") + "<color=#83E4EE>" + timer + "</color>";
             string nextText = "<color=#F4D26C>[TOTEM]</color> " + content;
             if (label.text != nextText) label.text = nextText;
-            opacity.alpha = !string.IsNullOrEmpty(timer) ? 1f : Mathf.Clamp01((float)((now-since)/0.12));
-            if (!empty && string.IsNullOrEmpty(timer)) opacity.alpha *= Mathf.Clamp01((float)((until-now)/0.25));
-            root.SetActive(true);
+            float alpha = !string.IsNullOrEmpty(timer) ? 1f : Mathf.Clamp01((float)((now-since)/0.12));
+            if (!empty && string.IsNullOrEmpty(timer)) alpha *= Mathf.Clamp01((float)((until-now)/0.25));
+            if (opacity.alpha != alpha) opacity.alpha = alpha;
+            if (!root.activeSelf) root.SetActive(true);
         }
 
         public Font LoadFont(string name)
@@ -108,10 +126,14 @@ namespace TotemMod
             root = UnityEngine.Object.Instantiate(prefab);
             root.name = "Totem lower-left eye-facing notification";
             root.SetActive(false);
+            rootTransform = root.transform;
+            hierarchy = root.GetComponentsInChildren<Transform>(true);
+            attachedCamera = null;
+            assignedLayer = -1;
             RectTransform rect = (RectTransform)root.transform;
             rect.sizeDelta = new Vector2(480, 140);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            Canvas canvas = root.GetComponent<Canvas>();
+            canvas = root.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             canvas.overrideSorting = true;
             canvas.sortingOrder = 32760;
@@ -155,7 +177,7 @@ namespace TotemMod
             outline.effectDistance = new Vector2(1f,-1f);
         }
 
-        public void Hide() { if (root != null) root.SetActive(false); }
+        public void Hide() { if (root != null && root.activeSelf) root.SetActive(false); }
         public void Clear() { Hide(); message = null; empty = false; }
 
         public void Dispose()
@@ -166,6 +188,7 @@ namespace TotemMod
             if (ownsBundle && bundle != null) bundle.Unload(false);
             if (stream != null) stream.Dispose();
             root = null; bundle = null; stream = null; message = null;
+            canvas = null; rootTransform = null; hierarchy = null; attachedCamera = null; assignedLayer = -1;
         }
     }
 }

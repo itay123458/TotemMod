@@ -30,6 +30,7 @@ namespace TotemMod
         private readonly TotemNotice notice = new TotemNotice();
         private readonly PalmAnchor localPalm = new PalmAnchor();
         private readonly TotemParticlePool particlePool = new TotemParticlePool();
+        private readonly List<PopParticleBatch> activeBursts=new List<PopParticleBatch>();
         private ConfigEntry<Vector3> handPosition;
         private ConfigEntry<Vector3> handRotation;
         private ConfigEntry<float> heldScale;
@@ -49,6 +50,11 @@ namespace TotemMod
         private readonly Dictionary<int, FriendTotem> friends = new Dictionary<int, FriendTotem>();
         private sealed class FriendTotem
         {
+            internal BetaAppearance Appearance,RenderAppearance;
+            internal Renderer[] TintTargets;
+            internal Transform CachedHand;
+            internal float HandLookupAt,NextTintAt,NextBetaRetryAt;
+            internal bool AvatarFallback,AvatarAllowed;
             internal readonly RemoteState State = new RemoteState();
             internal readonly PopDeduplicator Effects = new PopDeduplicator();
             internal readonly TotemInventory Supply = new TotemInventory();
@@ -83,6 +89,7 @@ namespace TotemMod
             InitializeAutoUpdater();
             sync = new PhotonSync(() => isActiveAndEnabled && Allowed, ReceiveFriend, RemoveFriend, ClearFriends, ReceiveRescue,ReceiveRules,ReceiveRefillRequest,ReceiveRefillResult,
                 actor => true,ReceiveDeveloperCommand,DeveloperCommandResult,SignDeveloperCommand,VerifyDeveloperCommand);
+            InitializeBetaSync();
             harmony = new Harmony("totemmod.gtag.rhys");
             try { Log.LogInfo("Confirmed-tag observers attached: " + TagObserver.Install(harmony)); }
             catch (Exception error) { Log.LogWarning("Tag observers: " + error.Message + ". Tagged-state fallback remains active."); }
@@ -166,6 +173,7 @@ namespace TotemMod
                 ClearEffects();
                 if (!RoomAllowed && menu != null) menu.Close();
                 if (sync != null) sync.Reset();
+                if (betaSync!=null) betaSync.Reset();
                 return;
             }
             TickSettings();
@@ -180,6 +188,7 @@ namespace TotemMod
             else if (notifyEquip.Value && equippedBefore && !state.Equipped) ShowNotice("Totem unequipped  |  " + StockText(), false);
             if (!state.Equipped) HideHeld();
             sync.Tick(state.Equipped, SafeSize(), Time.unscaledTime);
+            betaSync.Tick(LocalBetaState(),sync.LocalSession,Time.unscaledTime);
             TickDeveloperCommands();
         }
 
@@ -187,6 +196,8 @@ namespace TotemMod
         {
             if (!Allowed) return;
             MaintainBetaSource();
+            BetaAppearance current=HasBetaAccess && LocalBetaState().Enabled ? LocalBetaState() : null;
+            if (held!=null && !SameVisual(localRenderedAppearance,current)) HideHeld();
             UpdateNotice();
             UpdateFriends();
             if (!state.Equipped) return;
@@ -266,14 +277,17 @@ namespace TotemMod
             Log.LogInfo("Totem POP: " + StockText() + " left. Press Y again to equip another.");
         }
 
-        private IEnumerator PopAnimation(Transform head, bool local, float effectSize)
+        private IEnumerator PopAnimation(Transform head, bool local, float effectSize,BetaAppearance appearance=null,int ownerActor=0)
         {
             if (!Allowed || !fx.Value || head == null || assets == null || runtimeRoot == null) yield break;
             GameObject effect = new GameObject("Minecraft Totem pop");
             effect.transform.SetParent(runtimeRoot.transform, false);
-            GameObject icon = local ? CreateLocalVisual(effect.transform,"Totem pop icon",true) : assets.Create(effect.transform,"Totem pop icon");
-            float betaIconScale=local && betaEnabled.Value && betaInPop.Value ? SafeFloat(betaScale.Value,1,0.5f,2) : 1;
-            Renderer[] betaPopRenderers=local && betaEnabled.Value && betaInPop.Value && betaRainbow.Value ? icon.GetComponentsInChildren<Renderer>() : null;
+            if (local) { ownerActor=PhotonNetwork.LocalPlayer.ActorNumber; appearance=HasBetaAccess ? LocalBetaState() : null; }
+            if (appearance!=null && (!appearance.Enabled || !appearance.UseInPop)) appearance=null;
+            GameObject icon=CreateAppearanceVisual(effect.transform,"Totem pop icon",appearance,ownerActor);
+            float betaIconScale=appearance!=null ? appearance.Scale : 1;
+            Renderer[] betaPopRenderers=appearance!=null ? icon.GetComponentsInChildren<Renderer>() : null;
+            float nextPopTint=0;
             int layer = PopEffectLayer(local);
             foreach (Transform part in icon.GetComponentsInChildren<Transform>(true)) part.gameObject.layer=layer;
             GameObject sound = new GameObject("Minecraft totem sound");
@@ -292,8 +306,8 @@ namespace TotemMod
             if (local && haptics.Value) TryVibrate();
 
             int count = Math.Max(0,Math.Min(64,particleCount.Value));
-            Transform[] particles = new Transform[count];
             float[] seeds = new float[count];
+            Color[] colors=new Color[count];
             float sparkSize = SafeFloat(particleSize.Value,1,0.5f,3f);
             float spread = SafeFloat(particleSpread.Value,1,0.5f,2f);
             int palette = Math.Max(0,Math.Min(3,particlePalette.Value));
@@ -301,15 +315,17 @@ namespace TotemMod
             int shape=particleShape.Value;
             float brightness=SafeFloat(particleBrightness.Value,1,0.5f,1.5f);
             float sparkSpin=SafeFloat(particleSpin.Value,1,0,2);
+            PopParticleBatch burst=null;
             try
             {
             for (int i = 0; i < count; i++)
             {
                 seeds[i] = UnityEngine.Random.value;
                 Color tint=PopParticleColor(palette,i,seeds[i])*brightness; tint.a=1;
-                particles[i] = particlePool.Rent(effect.transform,(i % 3 == 0) ? green : gold,
-                    tint,layer,shape==1 || shape==0 && i%3 != 2);
+                colors[i]=tint;
             }
+            burst=new PopParticleBatch(effect.transform,count,seeds,colors,shape,layer);
+            activeBursts.Add(burst);
             float duration = PopParticleStyle.Duration;
             float elapsed = 0f;
             while (elapsed < duration && head != null && effect != null && Allowed && fx.Value)
@@ -324,25 +340,16 @@ namespace TotemMod
                 icon.transform.localScale = Vector3.one * scale * effectSize * betaIconScale;
                 icon.transform.localPosition = popMotion.Value==2 ? Vector3.zero : new Vector3(Mathf.Sin(elapsed * 11f) * 0.045f * (1f-progress), Mathf.Sin(progress * Mathf.PI) * 0.05f, 0f);
                 icon.transform.localRotation = popMotion.Value==2 ? Quaternion.identity : popMotion.Value==1 ? Quaternion.Euler(0,elapsed*220,0) : Quaternion.Euler(0f, Mathf.Sin(elapsed * 16f) * 32f * (1f-progress), Mathf.Sin(elapsed * 12f) * 22f * (1f-progress));
-                if (local && betaEnabled.Value && betaInPop.Value) icon.transform.localRotation*=Quaternion.Euler(BetaRotation());
-                if (betaPopRenderers!=null) ApplyBetaTint(betaPopRenderers);
-                for (int i = 0; i < count; i++)
-                {
-                    if (particles[i] == null) continue;
-                    PopSparkPose spark = PopParticleStyle.Evaluate(i,count,seeds[i],elapsed,sparkSize,spread,motion);
-                    particles[i].localPosition = new Vector3(spark.X,spark.Y,spark.Z);
-                    particles[i].localScale = Vector3.one * spark.Size;
-                    // Rotate only around the view axis: a pixel spark must not
-                    // turn edge-on and disappear in one eye.
-                    particles[i].localRotation = Quaternion.Euler(0,0,spark.Rotation*sparkSpin);
-                }
+                if (appearance!=null) icon.transform.localRotation*=Quaternion.Euler(appearance.TiltX,appearance.TiltY,appearance.TiltZ);
+                if (betaPopRenderers!=null && elapsed>=nextPopTint) { ApplyAppearanceTint(icon,betaPopRenderers,appearance); nextPopTint=elapsed+0.1f; }
+                burst.Tick(elapsed,sparkSize,spread,motion,sparkSpin);
                 elapsed += Time.unscaledDeltaTime * SafeFloat(popSpeed.Value,1,0.5f,2f);
                 yield return null;
             }
             }
             finally
             {
-                for (int i=0; i<count; i++) particlePool.Return(particles[i]);
+                if (burst!=null) { activeBursts.Remove(burst); burst.Dispose(); }
                 UnityEngine.Object.Destroy(effect);
                 if (!Allowed || !fx.Value) UnityEngine.Object.Destroy(sound);
             }
@@ -391,15 +398,19 @@ namespace TotemMod
 
         private void ClearEffects()
         {
-            if (runtimeRoot == null || runtimeRoot.transform.childCount == 0) return;
+            if (activeBursts.Count==0 && (runtimeRoot == null || runtimeRoot.transform.childCount == 0)) return;
             StopAllCoroutines();
+            for (int i=activeBursts.Count-1;i>=0;i--) activeBursts[i].Dispose();
+            activeBursts.Clear();
             particlePool.ReturnAll();
+            if (runtimeRoot==null) return;
             foreach (Transform child in runtimeRoot.transform) UnityEngine.Object.Destroy(child.gameObject);
         }
 
         [ModdedGamemodeJoin]
         public void OnModdedJoin(string gamemode)
         {
+            ResetBetaNetwork();
             betaSourceActor.Value=0; betaVisuals.ClearCache();
             queuedCommands.Clear(); commandStatus="Ready";
             inModdedRoom = true;
@@ -417,6 +428,7 @@ namespace TotemMod
         [ModdedGamemodeLeave]
         public void OnModdedLeave(string gamemode)
         {
+            ResetBetaNetwork();
             betaSourceActor.Value=0; betaVisuals.ClearCache();
             queuedCommands.Clear(); commandStatus="Ready";
             inModdedRoom = false;
@@ -427,7 +439,7 @@ namespace TotemMod
             if (sync != null) sync.Reset();
         }
 
-        private void OnDisable() { queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
+        private void OnDisable() { ResetBetaNetwork(); queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
 
         private void OnDestroy()
         {
@@ -442,7 +454,7 @@ namespace TotemMod
             if (runtimeRoot != null) UnityEngine.Object.Destroy(runtimeRoot);
             if (assets != null) assets.Dispose();
             betaVisuals.Dispose();
-            UnityEngine.Object.Destroy(betaClassicMaterial);
+            if (betaSync!=null) betaSync.Dispose();
             notice.Dispose();
             UnityEngine.Object.Destroy(gold); UnityEngine.Object.Destroy(green);
             if (Instance == this) Instance = null;

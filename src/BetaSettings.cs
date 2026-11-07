@@ -16,38 +16,38 @@ namespace TotemMod
         private ConfigEntry<Vector3> betaTint,betaTilt;
         private Renderer[] betaHeldRenderers;
         private readonly MaterialPropertyBlock betaTintBlock=new MaterialPropertyBlock();
-        private Material betaClassicMaterial;
         private bool betaWaitingForRig;
         private float betaRetryAt;
         private static readonly string[] BetaStyleNames={"Classic totem","Player model","Crystal","Block","Star"};
 
         private void InitializeBetaSettings()
         {
-            betaEnabled=Config.Bind("Beta","Enabled",false,"Local experimental appearance. Friends keep their normal totem visuals.");
-            betaInPop=Config.Bind("Beta","UseInPop",true,"Use the selected Beta model in your local pop animation.");
+            betaEnabled=Config.Bind("Beta","Enabled",false,"Experimental appearance shared with updated mod users. An approved account or developer room grant is required.");
+            betaInPop=Config.Bind("Beta","UseInPop",true,"Use the shared Beta model in pop animations.");
             betaUsePlayerColor=Config.Bind("Beta","PlayerColors",true,"Keep original avatar colors instead of tinting.");
-            betaRainbow=Config.Bind("Beta","Rainbow",false,"Cycle local model tint; disables original player colors.");
+            betaRainbow=Config.Bind("Beta","Rainbow",false,"Cycle shared model tint; overrides original player colors.");
             betaStyle=Config.Bind("Beta","Model",1,new ConfigDescription("0 Classic, 1 Player, 2 Crystal, 3 Block, 4 Star.",new AcceptableValueRange<int>(0,4)));
             betaSourceActor=Config.Bind("Beta","PlayerActor",0,"Avatar source in this room; zero means yourself. Resets on room change.");
-            betaScale=SliderSetting("Beta","ModelScale",1,0.5f,2,"Extra local Beta model scale.");
+            betaScale=SliderSetting("Beta","ModelScale",1,0.5f,2,"Extra shared Beta model scale.");
             betaSpin=SliderSetting("Beta","Spin",0,-120,120,"Held model rotation in degrees per second.");
             betaBob=SliderSetting("Beta","Bob",0,0,0.025f,"Held model bob height in meters.");
             betaRainbowSpeed=SliderSetting("Beta","RainbowSpeed",0.15f,0.05f,0.5f,"Rainbow color cycles per second.");
             betaTint=Config.Bind("Beta","Tint",Vector3.one,"Red, green and blue tint channels, each 0 to 1.");
-            betaTilt=Config.Bind("Beta","Tilt",Vector3.zero,"Extra local model pitch, yaw and roll.");
+            betaTilt=Config.Bind("Beta","Tilt",Vector3.zero,"Extra shared model pitch, yaw and roll.");
         }
         private void BetaChanged(bool refresh=false)
         {
             betaWaitingForRig=false;
-            if (refresh) betaVisuals.ClearCache();
-            HideHeld(); ChangedConfig();
+            betaAppearanceDirty=true;
+            if (refresh) { betaVisuals.ClearCache(); HideHeld(); localRenderedAppearance=null; }
+            ChangedConfig();
         }
         private void SetBetaFloat(ConfigEntry<float> entry,float value,float min,float max)
         { entry.Value=Mathf.Clamp(value,min,max); BetaChanged(); }
         private void FlipBeta(ConfigEntry<bool> entry) { entry.Value=!entry.Value; BetaChanged(); }
-        private Color BetaColor()
+        private Color BetaColor(bool animate=true)
         {
-            if (betaRainbow.Value) return Color.HSVToRGB(Mathf.Repeat(Time.unscaledTime*betaRainbowSpeed.Value,1),0.8f,1);
+            if (animate && betaRainbow.Value) return Color.HSVToRGB(Mathf.Repeat(BetaClock*betaRainbowSpeed.Value,1),0.8f,1);
             Vector3 value=betaTint.Value;
             return new Color(SafeFloat(value.x,1,0,1),SafeFloat(value.y,1,0,1),SafeFloat(value.z,1,0,1));
         }
@@ -80,11 +80,19 @@ namespace TotemMod
         }
         private GameObject CreateLocalVisual(Transform parent,string name,bool pop)
         {
+            BetaAppearance appearance=HasBetaAccess ? LocalBetaState() : null;
+            if (appearance!=null && (!appearance.Enabled || pop && !appearance.UseInPop)) appearance=null;
+            GameObject result=CreateAppearanceVisual(parent,name,appearance,PhotonNetwork.LocalPlayer.ActorNumber);
+            if (!pop) { localRenderedAppearance=appearance; betaHeldRenderers=result.GetComponentsInChildren<Renderer>(); }
+            return result;
+        }
+        private GameObject CreateAppearanceVisual(Transform parent,string name,BetaAppearance appearance,int owner,bool allowAvatar=true)
+        {
             GameObject visual=null;
-            if (betaEnabled.Value && (!pop || betaInPop.Value) && betaStyle.Value!=0)
+            if (appearance!=null && appearance.Style!=0 && (appearance.Style!=BetaTotemVisuals.PlayerModel || allowAvatar))
             {
-                visual=betaVisuals.Create(parent,name,BetaSourceRig(),betaStyle.Value,BetaColor(),betaUsePlayerColor.Value && !betaRainbow.Value);
-                if (betaStyle.Value==BetaTotemVisuals.PlayerModel)
+                visual=betaVisuals.Create(parent,name,AppearanceSource(owner,appearance),appearance.Style,AppearanceColor(appearance),appearance.UsePlayerColor && !appearance.Rainbow);
+                if (owner==PhotonNetwork.LocalPlayer.ActorNumber && appearance.Style==BetaTotemVisuals.PlayerModel)
                 {
                     bool failed=visual==null;
                     if (failed) { betaRetryAt=Time.unscaledTime+3; if (!betaWaitingForRig) ShowNotice("Avatar not ready; using classic totem",false); }
@@ -94,38 +102,43 @@ namespace TotemMod
             if (visual==null)
             {
                 visual=assets.Create(parent,name);
-                if (betaEnabled.Value && (!pop || betaInPop.Value) && betaStyle.Value==0)
+                if (appearance!=null)
                 {
-                    if (betaClassicMaterial==null)
-                    {
-                        Shader shader=Shader.Find("Sprites/Default");
-                        if (shader!=null) { betaClassicMaterial=new Material(shader); betaClassicMaterial.mainTexture=assets.Material.mainTexture; }
-                    }
-                    if (betaClassicMaterial!=null) visual.GetComponent<Renderer>().sharedMaterial=betaClassicMaterial;
-                    if (!betaUsePlayerColor.Value || betaRainbow.Value) ApplyBetaTint(visual.GetComponentsInChildren<Renderer>());
+                    TotemTintTexture tint=visual.AddComponent<TotemTintTexture>();
+                    tint.Initialize((Texture2D)assets.Material.mainTexture,visual.GetComponent<Renderer>());
+                    tint.Apply(appearance.UsePlayerColor && !appearance.Rainbow ? Color.white : AppearanceColor(appearance));
                 }
             }
-            int layer=PopEffectLayer(true);
+            int layer=PopEffectLayer(owner==PhotonNetwork.LocalPlayer.ActorNumber);
             foreach (Transform part in visual.GetComponentsInChildren<Transform>(true)) part.gameObject.layer=layer;
             return visual;
         }
         private void ApplyBetaHeld(GameObject item)
         {
-            if (!betaEnabled.Value) return;
-            item.transform.localScale*=SafeFloat(betaScale.Value,1,0.5f,2);
-            Vector3 tilt=BetaRotation();
-            item.transform.localRotation*=Quaternion.Euler(tilt+new Vector3(0,Time.unscaledTime*SafeFloat(betaSpin.Value,0,-120,120),0));
-            item.transform.localPosition+=Vector3.up*(Mathf.Sin(Time.unscaledTime*2)*SafeFloat(betaBob.Value,0,0,0.025f));
-            if (betaRainbow.Value)
-            {
-                if (betaHeldRenderers==null) betaHeldRenderers=item.GetComponentsInChildren<Renderer>();
-                ApplyBetaTint(betaHeldRenderers);
-            }
+            BetaAppearance appearance=HasBetaAccess ? LocalBetaState() : null;
+            if (appearance==null || !appearance.Enabled) return;
+            ApplyAppearanceHeld(item,appearance);
+            if (Time.unscaledTime>=betaRetryTintAt)
+            { ApplyAppearanceTint(item,betaHeldRenderers,appearance); betaRetryTintAt=Time.unscaledTime+0.1f; }
         }
-        private void ApplyBetaTint(Renderer[] renderers)
+        private float betaRetryTintAt;
+        private void ApplyAppearanceHeld(GameObject item,BetaAppearance appearance)
         {
-            betaTintBlock.Clear(); Color tint=BetaColor(); betaTintBlock.SetColor("_Color",tint); betaTintBlock.SetColor("_BaseColor",tint);
-            for (int i=0;i<renderers.Length;i++) if (renderers[i]!=null) renderers[i].SetPropertyBlock(betaTintBlock);
+            item.transform.localScale*=appearance.Scale;
+            item.transform.localRotation*=Quaternion.Euler(new Vector3(appearance.TiltX,appearance.TiltY+BetaClock*appearance.Spin,appearance.TiltZ));
+            item.transform.localPosition+=Vector3.up*(Mathf.Sin(BetaClock*2)*appearance.Bob);
+        }
+        private void ApplyAppearanceTint(GameObject item,Renderer[] renderers,BetaAppearance appearance)
+        {
+            if (appearance.UsePlayerColor && !appearance.Rainbow) return;
+            Color tint=AppearanceColor(appearance);
+            TotemTintTexture pixel=item.GetComponent<TotemTintTexture>(); if (pixel!=null) { pixel.Apply(tint); return; }
+            if (renderers==null) return;
+            for (int i=0;i<renderers.Length;i++) if (renderers[i]!=null)
+            {
+                betaTintBlock.Clear(); renderers[i].GetPropertyBlock(betaTintBlock);
+                betaTintBlock.SetColor("_Color",tint); betaTintBlock.SetColor("_BaseColor",tint); renderers[i].SetPropertyBlock(betaTintBlock);
+            }
         }
         private Vector3 BetaRotation()
         {

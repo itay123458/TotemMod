@@ -202,7 +202,7 @@ namespace TotemMod
                         BetaCheck("Original player colors",betaUsePlayerColor),BetaCheck("Use model during pop",betaInPop),
                         BetaFloat("Model scale",betaScale,0.5f,2,0.05f,"x"),
                         Button("Refresh player snapshot",() => BetaChanged(true)),
-                        new MenuEntry(() => "Beta appearance is local to your headset",null)
+                        new MenuEntry(() => HasBetaAccess ? "Synced to players using the updated mod" : "Beta access is locked",null)
                     }),
                     new MenuPage("Tint and motion",new[] {
                         BetaVector("Red",0,false),BetaVector("Green",1,false),BetaVector("Blue",2,false),
@@ -225,6 +225,16 @@ namespace TotemMod
                     })
                 }),
                 new MenuCategory("Dev",new[] {
+                    new MenuPage("Beta access",new[] {
+                        new MenuEntry(() => "Player: "+BetaGrantName(),CycleBetaGrantPlayer,true,() => IsDeveloper),
+                        DevButton("Grant Beta in this room",() => ChangeBetaGrant(true),() => betaGrantActor>0),
+                        DevButton("Revoke Beta in this room",() => ChangeBetaGrant(false),() => betaGrantActor>0),
+                        new MenuEntry(() => betaGrantActor>0 && betaSync.AccessFor(betaGrantActor) ? "Selected player: Beta allowed" : "Selected player: Beta locked",null),
+                        new MenuEntry(() => "Your approved account list is built in",null),
+                        new MenuEntry(() => "Temporary room grants end when you leave",null),
+                        DevButton("Show Beta access status",() => ShowNotice(HasBetaAccess ? "Beta access active" : "Beta access locked",false)),
+                        DevButton("Refresh local Beta model",() => BetaChanged(true))
+                    }),
                     new MenuPage("Local tools",new[] {
                         DevButton("Equip / unequip my totem",ToggleFromMenu,() => Allowed),
                         DevButton("Test pop (no stock spent)",DemoPop,() => Allowed),
@@ -255,8 +265,10 @@ namespace TotemMod
                     })
                 })
             };
-            if (!IsDeveloper) Array.Resize(ref categories,categories.Length-1);
-            return categories;
+            System.Collections.Generic.List<MenuCategory> visible=new System.Collections.Generic.List<MenuCategory>(categories);
+            if (!IsDeveloper) visible.RemoveAt(visible.Count-1);
+            if (!IsDeveloper && !HasBetaAccess) visible.RemoveAt(4);
+            return visible.ToArray();
         }
     }
 }

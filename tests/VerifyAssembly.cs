@@ -49,7 +49,7 @@ internal static class VerifyAssembly
             Check(Calls(module, "UnityEngine.Quaternion", "LookRotation") && module.Types.Any(t => t.Name == "TotemNotice"), "VR notification follows an eye-facing canvas");
             Check(module.Types.Any(t => t.Name == "TotemMenu") && Calls(module,"ControllerInputPoller","leftControllerPrimaryButton"),"Minecraft settings menu is bound to X input");
             Check(Calls(module,"TotemMod.PhotonSync","PublishRules") && Calls(module,"TotemMod.TotemInventory","Configure"),"host presets update shared rules and stock limits");
-            Check(Calls(module,"TotemMod.TotemParticlePool","Rent") && Calls(module,"TotemMod.TotemParticlePool","ReturnAll"),"pop particles use a reusable bounded pool");
+            Check(Calls(module,"TotemMod.PopParticleBatch","Tick") && Calls(module,"TotemMod.PopParticleBatch","Dispose"),"pop particles use one bounded batched renderer per burst");
             string[] menuAssets = {"background.png","button.png","button-highlighted.png","button-disabled.png","slider.png","slider-highlighted.png","handle.png","handle-highlighted.png","click.pcm"};
             Check(menuAssets.All(name => module.Resources.Any(r => r.Name == "TotemMod.Menu." + name)),"Minecraft menu textures and click are embedded");
             Check(Calls(module,"TotemMod.PhotonSync","RequestRefill") && Calls(module,"TotemMod.PhotonSync","ReplyRefill"),"guest Dev refills use a cooperative host handshake");

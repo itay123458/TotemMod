@@ -223,9 +223,14 @@ namespace TotemMod
             {
                 Player master=CurrentMaster();
                 string current=HostCommandSession(master);
-                return master == null || current == null ? null : master.ActorNumber.ToString()+":"+current;
+                if (master==authorityMasterCache && current==authorityGuidCache) return authorityTextCache;
+                authorityMasterCache=master; authorityGuidCache=current;
+                authorityTextCache=master == null || current == null ? null : master.ActorNumber.ToString()+":"+current;
+                return authorityTextCache;
             }
         }
+        private Player authorityMasterCache;
+        private string authorityGuidCache,authorityTextCache;
 
         private static string HostCommandSession(Player master)
         {
