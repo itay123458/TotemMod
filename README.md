@@ -1,6 +1,6 @@
 # Totem Mod
 
-Version **1.8.1**, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.9.0**, with Mace Mod **1.0.0**, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
@@ -22,7 +22,7 @@ Choose **Effects / Sound and Motion / Animation: Minimal** for a quick compact p
 
 ## Organized categories
 
-The developer has six top-level categories and 24 named pages. Approved Beta accounts have five categories; other accounts have four. Page selection is remembered separately for each category while the menu exists.
+The developer has six top-level categories and 26 named pages. Approved Beta accounts have five categories; other accounts have four. Page selection is remembered separately for each category while the menu exists.
 
 | Category | Pages and controls |
 |---|---|
@@ -31,7 +31,7 @@ The developer has six top-level categories and 24 named pages. Approved Beta acc
 | Effects | Particles, Sound and Motion, Friends and Quality, Effect Presets: amount/size/spread/colors/shape/brightness/spin; sound volume/pitch; animation style/speed/distance/height; friend range/render scale/sounds; haptics; six local effect presets and preview. |
 | Interface | Menu and Pointer, HUD, HUD Position, Notices and Controls, Updates: pointer/HUD preferences, local controls, resets, automatic updates, interval, check now, status and pending-update cancellation. |
 | Beta | Totem Model, Tint and Motion, Model Orientation, Experiments: selectable player avatar, crystal/block/star, tint/rainbow, scale, spin, bob, rotation, pop appearance, snapshot refresh and experimental presets. |
-| Dev | Beta Access, Local Tools, Room Control, Practice Shortcuts, Reset and Diagnostics: all developer tools are inside this single account-only category. |
+| Dev | Mace and Enchantments, Mace Effects, Beta Access, Local Tools, Room Control, Practice Shortcuts, Reset and Diagnostics: all developer tools are inside this single account-only category. |
 
 Minecraft's actual menu textures and click come from the local installation. Sliders show pending developer room changes while awaiting the host. Intermediate slider values coalesce; pending actions are canceled on host or room changes.
 
@@ -49,7 +49,19 @@ The Beta category and outgoing Beta appearance require the developer account, an
 
 Other experiments include recoloring the classic totem, crystal/block/star shapes, original player colors or RGB tint, rainbow speed, held spin/bob, model orientation, and using the chosen model during your pop. Mini Me, Emerald Crystal, Rainbow Star and Golden Block presets are included. Disable Beta or choose Return to Classic to undo the experiments.
 
-## Shared game rules and developer access
+## Minecraft mace
+
+The separate mod lives in `mace mod/` and builds to `mace mod/artifacts/MaceMod.dll`. It needs BepInEx and Utilla; it does not require Totem Mod. Install that DLL in `BepInEx/plugins` to equip a mace with **B** or keyboard **M**. **F8** opens its desktop settings. The Totem developer can also equip and configure a mace under **Dev / Mace and Enchantments**, including when only Totem Mod is installed.
+
+Mace hits work only in **private modded standard Infection / Tag**, between users running Mace Mod 1.0.0 or Totem Mod 1.9.0 or newer. Older Totem versions and vanilla players are unaffected. Receiving hits can be disabled in the active mod's settings. When both mods are installed, one shared runtime handles input, peer messages, effects and physics. The developer's Totem settings take priority; other accounts use standalone Mace settings when installed.
+
+Swing the mace head into a participating player. Falling distance determines smash strength: one block equals one meter at normal player scale. Grounding, new ascent, teleports, stale samples and completed hits clear old fall credit. Hit geometry, recent swing history, range, walls, current opt-in, fresh sessions and message order are checked again by the recipient.
+
+An **untagged attacker knocks the target back**. The target's own mod applies bounded local velocity. A **tagged attacker requests a native tag** unless the target has an equipped, charged totem and the current Totem rules permit protection. A save spends one charge after the acknowledged hit is published and plays the normal totem pop. Actual infection changes require the room host to run either compatible mod; native `ReportTag` validation, cooldown and normal synchronization remain in use. The mace never takes host authority.
+
+**Density 0–V** increases falling-hit strength, **Knockback 0–II** adds shove strength, and **Wind Burst 0–III** gives the attacker an upward rebound after a smash of at least 1.5 blocks. These are Gorilla Tag adaptations; there is no Minecraft armor system, so Breach is not included. Size, power, impact particles, sounds and opaque enchantment shimmer are configurable. The mace texture, critical-hit pixels and hit/smash/wind audio come from the local Minecraft installation. Enchantment reference: [Minecraft's Tricky Trials release notes](https://feedback.minecraft.net/hc/en-us/articles/27547857163917-Minecraft-Java-Edition-1-21-Tricky-Trials).
+
+## Totem protection
 
 In a private modded standard Infection/Tag room, an updated host can spend an equipped player's totem instead of applying one accepted tag. The host's ordinary synchronized infection state keeps that player untagged for everyone. Native tag validation stays intact. Public, competitive and unsupported modes have cosmetic pops only.
 

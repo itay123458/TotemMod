@@ -1,0 +1,22 @@
+MINECRAFT MACE MOD � LOCAL INSTALLATION
+
+1. Build with: & '.\mace mod\build.ps1'
+2. Close Gorilla Tag.
+3. Copy 'mace mod\artifacts\MaceMod.dll' into the game's BepInEx\plugins folder.
+4. Start the game with BepInEx 5 and Utilla installed. If the log says
+   "Utilla repair ready; restart Gorilla Tag", restart once before joining.
+   Installing the included TotemMod.UtillaFix.dll into BepInEx\patchers
+   before first launch avoids that extra restart.
+5. Join a private modded room. Press B (right controller) or M to equip.
+6. Press F8 for settings, or use Totem Mod's Developer page when installed.
+
+Totem Mod is optional. If both plugins are installed, they share one mace
+runtime. Both players need a compatible mod and incoming-hit opt-in.
+The mace resets when changing rooms. Open settings suspend outgoing hits.
+
+To remove: close the game and delete MaceMod.dll from BepInEx\plugins.
+Settings live under BepInEx\config\macemod.gtag.rhys.cfg.
+
+Builds use verified Minecraft assets extracted locally without downloads.
+Do not redistribute the extracted assets or local DLL embedding them.
+This task has not installed the plugin, launched Gorilla Tag or published files.

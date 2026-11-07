@@ -225,6 +225,20 @@ namespace TotemMod
                     })
                 }),
                 new MenuCategory("Dev",new[] {
+                    new MenuPage("Mace and enchantments",new[] {
+                        DevButton("Equip / unequip mace",()=>mace.Toggle(),()=>Allowed && mace!=null),
+                        MaceLevel("Density",maceDensity,5),MaceLevel("Knockback",maceKnockback,2),MaceLevel("Wind Burst",maceWind,3),
+                        Slider("Mace power",macePower,0.25f,2,0.05f,"x"),Slider("Mace size",maceScale,0.5f,1.5f,0.05f,"x"),
+                        new MenuEntry(()=>mace!=null ? mace.Status : "Mace unavailable",null),
+                        DevButton("Clear enchantments",ResetMaceEnchantments)
+                    }),
+                    new MenuPage("Mace effects",new[] {
+                        Check("Mace particles",maceParticles),Check("Mace sounds",maceSound),Check("Enchantment shimmer",maceGlint),
+                        Check("Accept mace hits",maceReceive),
+                        new MenuEntry(()=>"B or keyboard M toggles your mace",null),
+                        new MenuEntry(()=>"Fall further for a stronger hit",null),
+                        new MenuEntry(()=>"Updated Mace / Totem peers only",null)
+                    }),
                     new MenuPage("Beta access",new[] {
                         new MenuEntry(() => "Player: "+BetaGrantName(),CycleBetaGrantPlayer,true,() => IsDeveloper),
                         DevButton("Grant Beta in this room",() => ChangeBetaGrant(true),() => betaGrantActor>0),

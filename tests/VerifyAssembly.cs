@@ -31,7 +31,8 @@ internal static class VerifyAssembly
         using (ModuleDefinition module = ModuleDefinition.ReadModule(args[0]))
         {
             Check(Calls(module, "ControllerInputPoller", "leftControllerSecondaryButton"), "Y uses the left secondary button");
-            Check(!Calls(module, "ControllerInputPoller", "rightControllerSecondaryButton"), "B is not the equip input");
+            MethodDefinition totemInput=module.GetType("TotemMod.TotemPlugin").Methods.First(m=>m.Name=="YDown");
+            Check(!totemInput.Body.Instructions.Any(i=>i.Operand is MemberReference && ((MemberReference)i.Operand).Name=="rightControllerSecondaryButton"), "B remains separate from Totem equip input");
             Check(Calls(module, "GorillaLocomotion.GTPlayer", "GetHandFollower"), "attachment uses the game's Transform API");
             Check(module.Resources.Any(r => r.Name == "TotemMod.totem.png"), "Minecraft totem texture is embedded");
             Check(module.Resources.Any(r => r.Name == "TotemMod.pop.pcm"), "Minecraft pop audio is embedded");

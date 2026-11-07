@@ -86,6 +86,7 @@ namespace TotemMod
             volume = Config.Bind("General", "PopVolume", 0.9f, "Minecraft totem pop volume, 0 to 1.");
             fx = Config.Bind("General", "EnablePopFx", true, "Play the Minecraft pop sound, animation and gold/green particles.");
             InitializeSettings();
+            InitializeMace();
             InitializeAutoUpdater();
             sync = new PhotonSync(() => isActiveAndEnabled && Allowed, ReceiveFriend, RemoveFriend, ClearFriends, ReceiveRescue,ReceiveRules,ReceiveRefillRequest,ReceiveRefillResult,
                 actor => true,ReceiveDeveloperCommand,DeveloperCommandResult,SignDeveloperCommand,VerifyDeveloperCommand);
@@ -158,6 +159,7 @@ namespace TotemMod
 
         private void Update()
         {
+            TickMace();
             TickAutoUpdater();
             TickMenuControls();
             bool allowed = Allowed;
@@ -437,10 +439,11 @@ namespace TotemMod
             if (sync != null) sync.Reset();
         }
 
-        private void OnDisable() { ResetBetaNetwork(); queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
+        private void OnDisable() { StopMace(); ResetBetaNetwork(); queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
 
         private void OnDestroy()
         {
+            if(mace!=null) { mace.Dispose(); mace=null; }
             StopAutoUpdater();
             OnDisable();
             TagObserver.Uninstall();
