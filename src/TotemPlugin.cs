@@ -305,7 +305,8 @@ namespace TotemMod
             UnityEngine.Object.Destroy(sound, assets.Pop.length/audio.pitch + 0.1f);
             if (local && haptics.Value) TryVibrate();
 
-            int count = Math.Max(0,Math.Min(64,particleCount.Value));
+            int animation=popMotion.Value;
+            int count = PopAnimationStyle.ParticleCount(particleCount.Value,animation);
             float[] seeds = new float[count];
             Color[] colors=new Color[count];
             float sparkSize = SafeFloat(particleSize.Value,1,0.5f,3f);
@@ -326,23 +327,20 @@ namespace TotemMod
             }
             burst=new PopParticleBatch(effect.transform,count,seeds,colors,shape,layer);
             activeBursts.Add(burst);
-            float duration = PopParticleStyle.Duration;
+            float duration = PopAnimationStyle.Duration(animation);
             float elapsed = 0f;
             while (elapsed < duration && head != null && effect != null && Allowed && fx.Value)
             {
-                float progress = elapsed / duration;
+                PopIconPose pose=PopAnimationStyle.Evaluate(elapsed,animation);
                 effect.transform.position = local ? head.position + head.forward * SafeFloat(popDistance.Value,0.65f,0.4f,1.2f) + head.up * SafeFloat(popHeight.Value,-0.07f,-0.2f,0.2f) : head.position + Vector3.up * 0.08f;
                 Transform viewer = GetHead();
                 effect.transform.rotation = local || viewer == null ? head.rotation : Quaternion.LookRotation(head.position - viewer.position, Vector3.up);
-                float grow = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / 0.18f));
-                float shrink = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((progress - 0.72f) / 0.28f));
-                float scale = grow * shrink * (1f + 0.12f * Mathf.Sin(progress * Mathf.PI));
-                icon.transform.localScale = Vector3.one * scale * effectSize * betaIconScale;
-                icon.transform.localPosition = popMotion.Value==2 ? Vector3.zero : new Vector3(Mathf.Sin(elapsed * 11f) * 0.045f * (1f-progress), Mathf.Sin(progress * Mathf.PI) * 0.05f, 0f);
-                icon.transform.localRotation = popMotion.Value==2 ? Quaternion.identity : popMotion.Value==1 ? Quaternion.Euler(0,elapsed*220,0) : Quaternion.Euler(0f, Mathf.Sin(elapsed * 16f) * 32f * (1f-progress), Mathf.Sin(elapsed * 12f) * 22f * (1f-progress));
+                icon.transform.localScale = Vector3.one * pose.Scale * effectSize * betaIconScale;
+                icon.transform.localPosition = new Vector3(pose.X,pose.Y,pose.Z);
+                icon.transform.localRotation = Quaternion.Euler(pose.Pitch,pose.Yaw,pose.Roll);
                 if (appearance!=null) icon.transform.localRotation*=Quaternion.Euler(appearance.TiltX,appearance.TiltY,appearance.TiltZ);
                 if (betaPopRenderers!=null && elapsed>=nextPopTint) { ApplyAppearanceTint(icon,betaPopRenderers,appearance); nextPopTint=elapsed+0.1f; }
-                burst.Tick(elapsed,sparkSize,spread,motion,sparkSpin);
+                burst.Tick(elapsed,sparkSize,spread,motion,sparkSpin,animation);
                 elapsed += Time.unscaledDeltaTime * SafeFloat(popSpeed.Value,1,0.5f,2f);
                 yield return null;
             }

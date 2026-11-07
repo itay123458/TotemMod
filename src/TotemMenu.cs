@@ -112,13 +112,12 @@ namespace TotemMod
         private Target hovered;
         private Target done;
         private Target dragging;
-        private Image reticleImage;
+        private readonly Image[] reticleEdges = new Image[4];
+        private readonly MenuPointerState pointerState = new MenuPointerState();
         private LineRenderer laser;
         private Material overlayMaterial;
         private AudioSource clickSource;
         private GameObject audioRoot;
-        private double lastPointerTime;
-        private bool hadReticle;
         private float scale = 1;
         private float menuDistance = 1.1f;
         private float clickVolume = 0.3f;
@@ -204,8 +203,8 @@ namespace TotemMod
                 if (float.IsNaN(value) || float.IsInfinity(value)) return;
                 pointerWidth = Mathf.Clamp(value, 0.5f, 2);
                 if (laser == null) return;
-                laser.startWidth = 0.0015f * pointerWidth;
-                laser.endWidth = 0.0008f * pointerWidth;
+                laser.startWidth = 0.0010f * pointerWidth;
+                laser.endWidth = 0.00025f * pointerWidth;
             }
         }
 
@@ -245,7 +244,7 @@ namespace TotemMod
             reticle.gameObject.SetActive(false);
             hovered = null;
             dragging = null;
-            hadReticle = false;
+            pointerState.Reset();
             laser.enabled = false;
             Refresh();
             nextRefresh = 0;
@@ -256,7 +255,7 @@ namespace TotemMod
             open = false;
             hovered = null;
             dragging = null;
-            hadReticle = false;
+            pointerState.Reset();
             if (laser != null) laser.enabled = false;
             if (root != null) root.SetActive(false);
         }
@@ -272,7 +271,9 @@ namespace TotemMod
             Target hit = null;
             bool onPanel = false;
             bool onPlane = false;
-            Vector3 world = pointer.GetPoint(1.4f);
+            bool hadCapture = dragging != null;
+            pointerValid = pointerValid && Finite(pointer.origin) && Finite(pointer.direction) && pointer.direction.sqrMagnitude > 0.000001f;
+            Vector3 world = Vector3.zero;
             Vector2 aim = Vector2.zero;
             float distance;
             Plane plane = new Plane(rootRect.forward, rootRect.position);
@@ -282,8 +283,17 @@ namespace TotemMod
                 world = pointer.GetPoint(distance);
                 Vector3 local = rootRect.InverseTransformPoint(world);
                 aim = new Vector2(local.x, local.y);
-                onPanel = rootRect.rect.Contains(new Vector2(local.x, local.y));
-                if (onPanel)
+                onPanel = rootRect.rect.Contains(aim);
+            }
+            // Do this before hit testing. The exact same point drives hover,
+            // clicks, captured sliders, the hollow cursor and the beam endpoint.
+            pointerState.Update(onPlane && (onPanel || hadCapture), aim.x, aim.y, now, pointerSmoothing);
+            if (pointerState.Valid)
+            {
+                aim = new Vector2(pointerState.X, pointerState.Y);
+                world = rootRect.TransformPoint(new Vector3(aim.x, aim.y, 0));
+                onPanel = rootRect.rect.Contains(aim);
+                if (onPanel && !hadCapture)
                 {
                     for (int i = 0; i < targets.Count; i++)
                     {
@@ -296,9 +306,13 @@ namespace TotemMod
             }
             if (dragging != null)
             {
-                if (!held || !IsEnabled(dragging)) { Target old = dragging; dragging = null; Paint(old); }
-                else if (pointerValid && onPlane) UpdateSlider(dragging, world);
+                if (!held || !IsEnabled(dragging) || !targets.Contains(dragging))
+                { Target old = dragging; dragging = null; Paint(old); }
+                else if (pointerState.Valid) UpdateSlider(dragging, world);
             }
+            // Capture remains attached to its slider until release, even when
+            // tracking briefly drops or the hand passes across another control.
+            if (dragging != null && pointerState.Valid) hit = dragging;
             if (hovered != hit)
             {
                 Target old = hovered;
@@ -306,8 +320,9 @@ namespace TotemMod
                 Paint(old);
                 Paint(hovered);
             }
-            if (clicked && hit != null)
+            if (clicked && pointerState.Valid && hit != null && !hadCapture)
             {
+                pointerState.Click(now);
                 Target old = focused;
                 focused = hit;
                 Paint(old);
@@ -321,27 +336,33 @@ namespace TotemMod
                 else Activate(hit, hit.Direction);
             }
             if (!IsOpen) return;
-            bool showReticle = onPanel || (dragging != null && onPlane);
+            // Actions may synchronously replace the page and its targets.
+            if (hit != null && !targets.Contains(hit)) hit = null;
+            bool showReticle = pointerState.Valid && (onPanel || dragging != null);
             if (reticle.gameObject.activeSelf != showReticle) reticle.gameObject.SetActive(showReticle);
             if (showReticle)
             {
-                float elapsed = (float)Math.Max(0, Math.Min(0.1, now - lastPointerTime));
-                bool closeAim = hadReticle && (reticle.anchoredPosition - aim).sqrMagnitude < 900;
-                reticle.anchoredPosition = closeAim && !clicked && dragging == null && pointerSmoothing > 0 ?
-                    Vector2.Lerp(reticle.anchoredPosition, aim, 1 - Mathf.Exp(-35 * elapsed / pointerSmoothing)) : aim;
-                reticleImage.color = hit != null || dragging != null ? Yellow : pointerColor;
-                reticle.sizeDelta = Vector2.one * (hit != null || dragging != null ? 10 : 7);
+                reticle.anchoredPosition = aim;
+                Color cursorColor = dragging != null ? Color.white : hit != null ? Yellow : pointerColor;
+                for (int i = 0; i < reticleEdges.Length; i++) reticleEdges[i].color = cursorColor;
+                float pulse = pointerState.Pulse(now);
+                reticle.localScale = Vector3.one * ((hit != null || dragging != null ? 1.1f : 1) + pulse * 0.25f);
             }
-            hadReticle = showReticle;
-            lastPointerTime = now;
             laser.enabled = pointerValid;
             if (pointerValid)
             {
-                laser.startColor = new Color(pointerColor.r, pointerColor.g, pointerColor.b, 0.65f);
-                laser.endColor = hit != null || dragging != null ? Yellow : pointerColor;
+                laser.startColor = new Color(pointerColor.r, pointerColor.g, pointerColor.b, 0.28f);
+                laser.endColor = dragging != null ? Color.white : hit != null ? Yellow : pointerColor;
                 laser.SetPosition(0, pointer.origin + pointer.direction.normalized * 0.025f);
-                laser.SetPosition(1, onPanel || dragging != null ? world : pointer.GetPoint(1.4f));
+                laser.SetPosition(1, showReticle ? world : pointer.GetPoint(1.4f));
             }
+        }
+
+        private static bool Finite(Vector3 value)
+        {
+            return !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+                !float.IsNaN(value.y) && !float.IsInfinity(value.y) &&
+                !float.IsNaN(value.z) && !float.IsInfinity(value.z);
         }
 
         public void MoveFocus(int direction)
@@ -417,6 +438,7 @@ namespace TotemMod
             Target previousFocus = focused;
             hovered = null;
             dragging = null;
+            pointerState.Reset();
             BuildRows();
             focused = !categoryChanged && targets.Contains(previousFocus) ? previousFocus : null;
             if (focused == null)
@@ -553,8 +575,8 @@ namespace TotemMod
             laser.sharedMaterial = overlayMaterial;
             laser.useWorldSpace = true;
             laser.positionCount = 2;
-            laser.startWidth = 0.0015f * pointerWidth;
-            laser.endWidth = 0.0008f * pointerWidth;
+            laser.startWidth = 0.0010f * pointerWidth;
+            laser.endWidth = 0.00025f * pointerWidth;
             laser.shadowCastingMode = ShadowCastingMode.Off;
             laser.receiveShadows = false;
             laser.sortingOrder = 32760;
@@ -582,9 +604,16 @@ namespace TotemMod
             done.Done = true;
             MakeText("Controls", rootRect, "Point + trigger / drag | arrows + Enter | Tab: page | Shift+Tab: category", 0, -331, 844, 28, 16);
             BuildRows();
-            reticleImage = MakeImage("Pointer", rootRect, 0, 0, 7, 7, pointerColor);
-            reticle = reticleImage.rectTransform;
-            MakeImage("Pointer center", reticle, 0, 0, 3, 3, Color.white);
+            reticle = MakeRect("Pointer", rootRect, 0, 0, 12, 12);
+            // A Minecraft-style hollow square keeps the aimed-at text visible.
+            MakeImage("Pointer top shadow", reticle, 0, 5, 14, 3, Color.black);
+            MakeImage("Pointer bottom shadow", reticle, 0, -5, 14, 3, Color.black);
+            MakeImage("Pointer left shadow", reticle, -5, 0, 3, 8, Color.black);
+            MakeImage("Pointer right shadow", reticle, 5, 0, 3, 8, Color.black);
+            reticleEdges[0] = MakeImage("Pointer top", reticle, 0, 5, 12, 1.4f, pointerColor);
+            reticleEdges[1] = MakeImage("Pointer bottom", reticle, 0, -5, 12, 1.4f, pointerColor);
+            reticleEdges[2] = MakeImage("Pointer left", reticle, -5, 0, 1.4f, 8, pointerColor);
+            reticleEdges[3] = MakeImage("Pointer right", reticle, 5, 0, 1.4f, 8, pointerColor);
             reticle.gameObject.SetActive(false);
             Refresh();
         }
@@ -734,7 +763,8 @@ namespace TotemMod
             root = null; rootRect = null; rowRoot = null; reticle = null;
             status = null; pageTitle = null; font = null; canvas = null; focused = null; hovered = null; done = null;
             targets.Clear(); rows.Clear();
-            overlayMaterial = null; audioRoot = null; clickSource = null; laser = null; reticleImage = null; dragging = null;
+            overlayMaterial = null; audioRoot = null; clickSource = null; laser = null; dragging = null;
+            for (int i = 0; i < reticleEdges.Length; i++) reticleEdges[i] = null;
         }
     }
 }

@@ -29,7 +29,7 @@ namespace TotemMod
             particleBrightness=SliderSetting("Effects","ParticleBrightness",1,0.5f,1.5f,"Pixel spark brightness multiplier.");
             particleSpin=SliderSetting("Effects","ParticleSpin",1,0,2,"Pixel spark rotation multiplier.");
             friendRenderScale=SliderSetting("Effects","FriendRenderScale",1,0.5f,1.5f,"Local size multiplier for friends' totems.");
-            popMotion=Config.Bind("Effects","PopMotion",0,new ConfigDescription("0 Minecraft sway, 1 Spin, 2 Still.",new AcceptableValueRange<int>(0,2)));
+            popMotion=Config.Bind("Effects","PopMotion",3,new ConfigDescription("0 Minecraft sway, 1 Spin, 2 Still, 3 Minimal (quick compact pop, up to twelve small sparks).",new AcceptableValueRange<int>(0,3)));
             particleShape=Config.Bind("Effects","ParticleShape",0,new ConfigDescription("0 Mixed, 1 Sparkles, 2 Flecks.",new AcceptableValueRange<int>(0,2)));
             popSound=Config.Bind("Effects","PopSound",true,"Play the Minecraft totem sound.");
             friendPopSound=Config.Bind("Effects","FriendPopSound",true,"Hear nearby friends' pop sounds.");
@@ -88,7 +88,7 @@ namespace TotemMod
             if (preset==2) { particleCount.Value=64; particleSize.Value=1.5f; particleMotion.Value=1; popSpeed.Value=0.75f; }
             if (preset==3) { particlePalette.Value=3; particleShape.Value=1; particleSize.Value=1.25f; }
             if (preset==4) { particlePalette.Value=2; particleBrightness.Value=1.4f; particleMotion.Value=1; }
-            if (preset==5) { particleCount.Value=12; particleSize.Value=0.75f; haptics.Value=false; }
+            if (preset==5) { popMotion.Value=3; particleCount.Value=12; particleSize.Value=0.75f; haptics.Value=false; }
             ChangedConfig();
         }
         private void PreviewPop()

@@ -50,6 +50,7 @@ internal static class VerifyAssembly
             Check(module.Types.Any(t => t.Name == "TotemMenu") && Calls(module,"ControllerInputPoller","leftControllerPrimaryButton"),"Minecraft settings menu is bound to X input");
             Check(Calls(module,"TotemMod.PhotonSync","PublishRules") && Calls(module,"TotemMod.TotemInventory","Configure"),"host presets update shared rules and stock limits");
             Check(Calls(module,"TotemMod.PopParticleBatch","Tick") && Calls(module,"TotemMod.PopParticleBatch","Dispose"),"pop particles use one bounded batched renderer per burst");
+            Check(Calls(module,"TotemMod.PopAnimationStyle","Evaluate") && Calls(module,"TotemMod.PopAnimationStyle","Duration") && Calls(module,"TotemMod.PopAnimationStyle","ParticleCount"),"compact icon and particle timing are wired into the pop animation");
             string[] menuAssets = {"background.png","button.png","button-highlighted.png","button-disabled.png","slider.png","slider-highlighted.png","handle.png","handle-highlighted.png","click.pcm"};
             Check(menuAssets.All(name => module.Resources.Any(r => r.Name == "TotemMod.Menu." + name)),"Minecraft menu textures and click are embedded");
             Check(Calls(module,"TotemMod.PhotonSync","RequestRefill") && Calls(module,"TotemMod.PhotonSync","ReplyRefill"),"guest Dev refills use a cooperative host handshake");

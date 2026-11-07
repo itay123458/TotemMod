@@ -87,6 +87,11 @@ $taskMenuInputTests = Join-Path $taskTests 'MenuInputTests.exe'
 if ($LASTEXITCODE -ne 0) { throw 'Menu input tests compilation failed.' }
 & $taskMenuInputTests
 if ($LASTEXITCODE -ne 0) { throw 'Menu input tests failed.' }
+$taskPointerTests=Join-Path $taskTests 'MenuPointerTests.exe'
+& $taskCsc /nologo /target:exe /langversion:5 /warnaserror+ ("/out:"+$taskPointerTests) ("/reference:"+$taskCecil) (Join-Path $PSScriptRoot 'src\MenuPointerState.cs') (Join-Path $PSScriptRoot 'tests\MenuPointerTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Menu pointer tests compilation failed.' }
+& $taskPointerTests $taskDll
+if ($LASTEXITCODE -ne 0) { throw 'Menu pointer tests failed.' }
 Write-Output "Verified: $taskDll"
 $taskDeveloperTests = Join-Path $taskTests 'DeveloperAccessTests.exe'
 & $taskCsc /nologo /target:exe /warnaserror+ ("/out:" + $taskDeveloperTests) (Join-Path $PSScriptRoot 'src\DeveloperAccess.cs') (Join-Path $PSScriptRoot 'tests\DeveloperAccessTests.cs')
@@ -103,6 +108,11 @@ $taskParticleTests = Join-Path $taskTests 'PopParticleStyleTests.exe'
 if ($LASTEXITCODE -ne 0) { throw 'Particle style tests compilation failed.' }
 & $taskParticleTests
 if ($LASTEXITCODE -ne 0) { throw 'Particle style tests failed.' }
+$taskPopAnimationTests=Join-Path $taskTests 'PopAnimationStyleTests.exe'
+& $taskCsc /nologo /target:exe /langversion:5 /warnaserror+ ("/out:"+$taskPopAnimationTests) (Join-Path $PSScriptRoot 'tests\PopAnimationStyleTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Pop animation tests compilation failed.' }
+& $taskPopAnimationTests $taskDll
+if ($LASTEXITCODE -ne 0) { throw 'Pop animation tests failed.' }
 $taskQueueTests = Join-Path $taskTests 'RoomCommandQueueTests.exe'
 & $taskCsc /nologo /target:exe /warnaserror+ ("/out:" + $taskQueueTests) (Join-Path $PSScriptRoot 'src\DeveloperCommand.cs') (Join-Path $PSScriptRoot 'src\RoomCommandQueue.cs') (Join-Path $PSScriptRoot 'tests\RoomCommandQueueTests.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Room command queue tests compilation failed.' }

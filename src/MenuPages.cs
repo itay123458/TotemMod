@@ -139,7 +139,7 @@ namespace TotemMod
                     }),
                     new MenuPage("Sound and motion",new[] {
                         Check("Pop sound",popSound),FloatSlider("Volume",volume,0,1,0.05f),Slider("Pitch",popPitch,0.5f,1.5f,0.05f,"x"),
-                        Slider("Animation speed",popSpeed,0.5f,2,0.1f,"x"),Select("Animation",popMotion,new[]{"Minecraft sway","Spin","Still"}),
+                        Slider("Animation speed",popSpeed,0.5f,2,0.1f,"x"),Select("Animation",popMotion,new[]{"Minecraft sway","Spin","Still","Minimal"}),
                         Slider("Pop distance",popDistance,0.4f,1.2f,0.05f,"m"),Slider("Pop height",popHeight,-0.2f,0.2f,0.01f,"m"),
                         Button("Preview pop (no stock spent)",PreviewPop,() => Allowed)
                     }),
@@ -153,7 +153,7 @@ namespace TotemMod
                     new MenuPage("Effect presets",new[] {
                         Button("Minecraft classic",() => SetEffectPreset(0)),Button("Quiet",() => SetEffectPreset(1)),
                         Button("Cinematic swirl",() => SetEffectPreset(2)),Button("Frost sparkles",() => SetEffectPreset(3)),
-                        Button("Golden burst",() => SetEffectPreset(4)),Button("Minimal particles",() => SetEffectPreset(5)),
+                        Button("Golden burst",() => SetEffectPreset(4)),Button("Minimal pop",() => SetEffectPreset(5)),
                         Button("Preview current effects",PreviewPop,() => Allowed),Button("Clear current effects",ClearEffects)
                     })
                 }),

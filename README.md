@@ -1,6 +1,6 @@
 # Totem Mod
 
-Version **1.8.0**, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.8.1**, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
@@ -15,6 +15,10 @@ Close Gorilla Tag, download the release ZIP and extract it into the Gorilla Tag 
 - Keyboard arrows/Enter select controls; **Tab** changes page; **Shift+Tab** or **Page Up / Page Down** changes category; Escape closes settings.
 
 The default supply is **5**, regenerating **1 every 40 seconds**. Additional pops preserve recharge progress. All gameplay, previews and effects require a modded room.
+
+The controller pointer uses one filtered position for the cursor, laser, hover and click. Small hand movements are smoothed; larger movements respond immediately. The thin tapered laser ends at a hollow square cursor with hover/drag colors and a short click pulse. Sliders stay captured until the trigger is released, including after a brief loss of aim. Smoothing can be disabled under Interface / Menu and Pointer.
+
+Choose **Effects / Sound and Motion / Animation: Minimal** for a quick compact pop: 0.78 seconds at normal speed, a smaller icon with a gentle settle, and up to twelve smaller sparks that fade with it. The **Minimal Pop** effect preset selects this animation too. New configurations default to Minimal; existing animation choices are retained. Minecraft Sway, Spin and Still remain available.
 
 ## Organized categories
 

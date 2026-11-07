@@ -83,16 +83,19 @@ namespace TotemMod
             }
         }
 
-        internal void Tick(float elapsed, float size, float spread, int motion, float spin)
+        internal void Tick(float elapsed, float size, float spread, int motion, float spin, int animation=0)
         {
             if (disposed || count == 0 || mesh == null) return;
             spin = float.IsNaN(spin) || float.IsInfinity(spin) ? 1 : Math.Max(0,Math.Min(2,spin));
+            elapsed=PopAnimationStyle.ParticleTime(elapsed,animation);
+            float compactSpread=PopAnimationStyle.ParticleSpread(animation),compactSize=PopAnimationStyle.ParticleSize(animation);
             Vector3 minimum = new Vector3(float.PositiveInfinity,float.PositiveInfinity,float.PositiveInfinity);
             Vector3 maximum = new Vector3(float.NegativeInfinity,float.NegativeInfinity,float.NegativeInfinity);
             int offset = 0;
             for (int i = 0; i < count; i++)
             {
                 PopSparkPose pose = PopParticleStyle.Evaluate(i,count,seeds[i],elapsed,size,spread,motion);
+                pose.X*=compactSpread; pose.Y*=compactSpread; pose.Size*=compactSize;
                 float angle = pose.Rotation*spin*Mathf.Deg2Rad;
                 float cosine = Mathf.Cos(angle)*pose.Size, sine = Mathf.Sin(angle)*pose.Size;
                 MeshPoint[] points = sources[i].Positions;
