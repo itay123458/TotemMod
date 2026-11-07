@@ -1,0 +1,9 @@
+analysis/
+backups/
+assets/
+artifacts/
+*.user
+*.private.xml
+*.pfx
+*.pem
+*.key

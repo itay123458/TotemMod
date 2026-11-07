@@ -1,0 +1,104 @@
+# Totem Mod
+
+Version **1.7.1**, for the installed Gorilla Tag build, BepInEx and Utilla.
+
+[Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
+
+## Install and controls
+
+Close Gorilla Tag, download the release ZIP and extract it into the Gorilla Tag folder. Install both `BepInEx/plugins/TotemMod.dll` and `BepInEx/patchers/TotemMod.Updater.dll`. BepInEx and Utilla are required separately. Keep one copy of each plugin. Restart after replacing DLLs; the optional Utilla compatibility fix requires a new private Modded Infection room. Source builders get the two Totem DLLs in `artifacts/`; the Utilla patch can be built locally from `compat/utilla/`.
+
+- **Y:** equip or unequip. Unequipping spends nothing. A pop spends one totem; release and press again for another.
+- **Hold X** (default 0.6 seconds), or **F7:** open/close settings.
+- Aim the right controller and pull the trigger. Hold the trigger to drag sliders.
+- Category tabs select a category. The arrows beside the page title move between its pages.
+- Keyboard arrows/Enter select controls; **Tab** changes page; **Shift+Tab** or **Page Up / Page Down** changes category; Escape closes settings.
+
+The default supply is **5**, regenerating **1 every 40 seconds**. Additional pops preserve recharge progress. All gameplay, previews and effects require a modded room.
+
+## Organized categories
+
+The developer has six top-level categories and 23 named pages. Other accounts have the five regular categories. Page selection is remembered separately for each category while the menu exists.
+
+| Category | Pages and controls |
+|---|---|
+| Game | Presets, Rules, Round: five presets, stock/recharge/cap sliders, protection, auto-start, timer controls, refills and time-cap shortcuts. |
+| Totem | Size and Grip, Palm Position, Palm Rotation: global/held scales, grip presets, saved custom grip, position/rotation sliders and 90-degree steps. |
+| Effects | Particles, Sound and Motion, Friends and Quality, Effect Presets: amount/size/spread/colors/shape/brightness/spin; sound volume/pitch; animation style/speed/distance/height; friend range/render scale/sounds; haptics; six local effect presets and preview. |
+| Interface | Menu and Pointer, HUD, HUD Position, Notices and Controls, Updates: pointer/HUD preferences, local controls, resets, automatic updates, interval, check now, status and pending-update cancellation. |
+| Beta | Totem Model, Tint and Motion, Model Orientation, Experiments: selectable player avatar, crystal/block/star, tint/rainbow, scale, spin, bob, rotation, pop appearance, snapshot refresh and experimental presets. |
+| Dev | Local Tools, Room Control, Practice Shortcuts, Reset and Diagnostics: all developer tools are inside this single account-only category. |
+
+Minecraft's actual menu textures and click come from the local installation. Sliders show pending developer room changes while awaiting the host. Intermediate slider values coalesce; pending actions are canceled on host or room changes.
+
+## Beta appearance
+
+Go to **Beta / Totem Model**, enable Experimental Appearance, choose **Player model**, then use **Player** to select your own avatar or another player in the current room. **Refresh player snapshot** captures a fresh pose and appearance.
+
+Avatar models are render-only snapshots. The code bakes the existing body/face and supported cosmetic meshes, copies their render data, and normalizes the miniature's size. It does not clone a VRRig, activate a source player, add networking or physics, or move another player. Capture is limited to six renderers and 100,000 total vertices. Generated totems are excluded so a miniature cannot recursively capture an older miniature.
+
+The pose is a snapshot rather than a continuously animated avatar. Missing avatar data uses the classic totem and retries while equipped. Selection resets to yourself when changing rooms or when the selected player leaves.
+
+Beta appearance is **local to your headset**. Friends continue to see the normal synchronized Minecraft totem. Gameplay stock, tag protection and shared timers are unchanged by Beta visuals.
+
+Other experiments include recoloring the classic totem, crystal/block/star shapes, original player colors or RGB tint, rainbow speed, held spin/bob, model orientation, and using the chosen model during your pop. Mini Me, Emerald Crystal, Rainbow Star and Golden Block presets are included. Disable Beta or choose Return to Classic to undo the experiments.
+
+## Shared game rules and developer access
+
+In a private modded standard Infection/Tag room, an updated host can spend an equipped player's totem instead of applying one accepted tag. The host's ordinary synchronized infection state keeps that player untagged for everyone. Native tag validation stays intact. Public, competitive and unsupported modes have cosmetic pops only.
+
+Friends running the updated visual mod see equipped totems and hear nearby Minecraft pop sounds. Late joins receive the current held state and host rules without replaying old pops or stock refills.
+
+| Preset | Stock | Recharge | Timer |
+|---|---:|---:|---|
+| Default | 5 | 40 seconds | Manual, 3:00 |
+| Scrims | 3 | 60 seconds | First confirmed tag, 3:00 cap |
+| Filming | 5 | 10 seconds | Manual, 3:00 |
+| Casual | 8 | 30 seconds | Manual, 3:00 |
+| Sandbox | 20 | 1 second | Manual, 3:00 |
+
+Starting a configured **3:00 timer selects the full Scrims preset**, then starts its countdown. Other timer lengths preserve their configuration. The cap pauses totem protection until the timer is reset or restarted; it does not reset the native game round. Presets preserve stock and proportional recharge progress; refill is a separate action.
+
+Only the developer's logged-in Steam account sees **Dev**. A nickname, host role or editable config cannot unlock it. Each developer action rechecks identity, and a changed login discards the old menu.
+
+The private host applies shared rules. Developer guest controls are always enabled when the host runs **1.6.1 or newer**; there is no host enable switch. Commands require the developer's signature plus valid membership, host session, timing and replay order. The developer's private key stays on this computer in `BepInEx/config/TotemMod.developer-key.xml`, with a backup under `%USERPROFILE%/.totemmod/`. Friends receive the DLL only. Other hosts need no private key.
+
+Developer room actions never take host authority or bypass native tag validation. An unsupported host, missing key or request timeout reports unavailable. Local test pops spend no stock and change no infection or friend state.
+
+## Utilla Infection compatibility
+
+Old Utilla advertises `MODDED_Infection`; vanilla's manager validation requires exact `Infection`. This mismatch can prevent non-Utilla clients from recognizing the manager.
+
+The private-room patch advertises native Infection and keeps explicit modded opt-in in `org.legoandmars.utilla.mode = MODDED_Infection`. Patched Utilla projects the modded designation locally for its callbacks. Serializer and tag validation remain intact.
+
+The creator/host needs patched Utilla and a **new private Modded Infection room**. Vanilla friends need no plugin. Utilla mod users need patched Utilla for modded callbacks; an older Utilla sees ordinary Infection. Ordinary Infection clears the marker. The patch targets the installed game/Utilla hashes; another game build requires checking compatibility again.
+
+## Automatic updates
+
+Automatic updates are on by default. The plugin checks the public GitHub release feed shortly after startup, then every six hours by default. Configure it under **Interface / Updates**, or check manually there. No GitHub login is needed to receive updates.
+
+New versions must have a valid publisher RSA signature, exact DLL hash/size, expected plugin identity/version and matching tested game build. Downloads are bounded and HTTPS-only. The runtime stages verified files without replacing its loaded DLL. At the next game launch, the preloader helper checks them again and atomically installs the new plugin before plugin loading, keeping the old DLL in `BepInEx/cache/TotemModUpdater/backups/`.
+
+Network failures, bad signatures, corrupt files, downgrades, unsupported helper versions and game mismatches retain the installed plugin. Old pending files for an incompatible game are cleared on the next check so a compatible release can be discovered. The updater changes Totem Mod only, not Utilla, game assemblies, personal settings or developer keys. Use the release ZIP once to install the helper; future supported Totem DLL releases update automatically.
+
+To publish a new version as the repository owner, change `ModVersion` in `src/AutoUpdateSettings.cs`, update the README and run `tools/publish-release.ps1 -Publish`. It builds/tests, signs the manifest locally, packages an explicit source allowlist, preserves repository history and publishes a new immutable version tag. The update-signing key stays under `%USERPROFILE%/.totemmod/update-signing-private.xml`; it is separate from the developer-command key and must remain private. Neither key is in GitHub or the release ZIP.
+
+## Build and validation
+
+Run `./build.ps1`. It uses the existing Windows C# compiler and installed game references. Missing Minecraft assets are extracted locally by the scripts in `tools/` (Python and ffmpeg); no SDK or loader is installed.
+
+Checks cover equip/inventory, palm placement, accepted tags and protection, private signed commands, host migration/replay/membership, Scrims selection, developer identity, remote slider intent, configurable X hold timing, category paging, particles and render-only avatar safety. Updater tests cover strict signed manifests, bounded downloads, game/version checks, tampering, locks, junctions, staging, atomic installation and exact backup bytes. Public source builds use a temporary test-only signing identity when no publisher key exists; production DLLs always retain the fixed trusted public key. `build.ps1 -UseTestUpdateKey` explicitly tests that public-build path.
+
+The Utilla build script is `compat/utilla/build.ps1`; its checks include the actual installed game's mode-name predicate. The predicate rejects the legacy alias and accepts the canonical name.
+
+These are compilation, assembly, mathematical and boundary-fixture checks. The newest category layout and Beta avatar appearance need headset verification; mixed-client Infection and developer guest commands need live multiplayer verification. Earlier classic mesh, animation and audio were checked in game.
+
+The menu remains inactive while closed, labels refresh at 10 Hz, config writes debounce for one second, friend effects are distance-culled, and particles reuse a pool capped at 128. Avatar snapshots have a three-second cache; owned meshes/materials are released with their render instances. No measured frame-rate claim is made.
+
+## Backups and provenance
+
+Timestamped previous DLLs are in `backups/`. Original Utilla is also in `compat/utilla/backups/Utilla.original.dll`. Private recovered source remains under `analysis/original/`; replacement source is in `src/`.
+
+Minecraft assets belong to Mojang/Microsoft. Local extractors verify cached sounds and record provenance under `assets/`. Source is available under GPL v2; Minecraft asset ownership is separate. Original game assemblies, recovered original mod source, local logs, personal configurations and signing keys are excluded from the public repository and release packages.
+
+Notification template/fonts: [GorillaNotifications](https://github.com/hamburbur-org/Gorilla-Notifications). GPL v2 license and attribution are in `third_party/GorillaNotifications/`; adapted code is `src/TotemNotice.cs`. The Utilla binary is a private local compatibility modification.
