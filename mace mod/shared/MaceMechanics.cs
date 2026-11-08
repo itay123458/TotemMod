@@ -7,6 +7,7 @@ namespace MaceMod.Shared
     internal sealed class MaceFall
     {
         private const double GraceSeconds = 0.12;
+        private const double LandingGraceSeconds = 0.25;
         private bool initialized, wasGrounded, falling;
         private float lastHeight, lastTime, scale, blocks, velocityY;
         private double peak, lowest, lastDescent, landedAt;
@@ -47,7 +48,7 @@ namespace MaceMod.Shared
                 // Repeated contact samples must not renew the landing grace.
                 if (grounded)
                 {
-                    if ((double)now - landedAt > GraceSeconds) blocks = 0;
+                    if ((double)now - landedAt > LandingGraceSeconds) blocks = 0;
                     peak = lowest = height;
                     velocityY = 0;
                     SaveSample(height, now, true);
@@ -124,11 +125,19 @@ namespace MaceMod.Shared
 
     internal static class MaceMechanics
     {
+        internal static float ImpulseVertical(float velocity,float lift)
+        {
+            if(!Finite(velocity) || !Finite(lift)) return 0;
+            double combined=(double)velocity+lift;
+            if(lift>0) combined=Math.Max(combined,lift);
+            return (float)Math.Max(-float.MaxValue,Math.Min(float.MaxValue,combined));
+        }
+
         internal static float Knockback(float blocks, int density, int knockback, float power)
         {
             if (!Finite(blocks) || !Finite(power)) return 0;
             double drop = Clamp(blocks, 0, 64);
-            double strength = 3 + 1.4 * Math.Sqrt(drop) + 0.6 * Clamp(density, 0, 5) + 1.4 * Clamp(knockback, 0, 2);
+            double strength = 3 + (1.4 + 0.5 * Clamp(density, 0, 5)) * Math.Sqrt(drop) + 1.4 * Clamp(knockback, 0, 2);
             return (float)Math.Min(18, strength * Clamp(power, 0.25, 2));
         }
 
@@ -136,6 +145,24 @@ namespace MaceMod.Shared
         {
             if (!Finite(blocks) || blocks < 1.5f || level <= 0) return 0;
             return (float)Math.Min(9, 2 + 1.5 * Clamp(level, 0, 3) + 0.5 * Math.Sqrt(Clamp(blocks, 0, 64)));
+        }
+
+        internal static float HitRadius(float targetScale,float attackerScale,float weaponScale)
+        {
+            if(!Finite(targetScale) || !Finite(attackerScale) || !Finite(weaponScale)) return 0;
+            return (float)(0.48*Clamp(targetScale,0.2,4)+0.16*Clamp(attackerScale,0.2,4)*Clamp(weaponScale,0.5,1.5));
+        }
+
+        internal static int ClosestBodyZone(float ax,float ay,float az,float bx,float by,float bz,float px,float py,float pz,float targetScale)
+        {
+            int zone=0;
+            float best=SegmentDistanceSquared(ax,ay,az,bx,by,bz,px,py,pz);
+            for(int candidate=-1;candidate<=1;candidate+=2)
+            {
+                float distance=SegmentDistanceSquared(ax,ay,az,bx,by,bz,px,py+candidate*0.35f*targetScale,pz);
+                if(distance<best) { best=distance; zone=candidate; }
+            }
+            return zone;
         }
 
         // Double intermediates keep all finite float coordinates representable.

@@ -51,7 +51,9 @@ internal static class MaceMechanicsTests
         Check(!fall.Falling, "ground contact stops Falling");
         fall.Update(5.9f, 1.10f, true);
         Near(fall.Blocks, 6.1f, 0.002f, "landing credit survives collision update order");
-        fall.Update(5.9f, 1.15f, true);
+        fall.Update(5.9f, 1.24f, true);
+        Near(fall.Blocks,6.1f,0.002f,"smash credit survives a brief landing before the swing connects");
+        fall.Update(5.9f, 1.30f, true);
         Near(fall.Blocks, 0, 0, "standing cannot retain landing credit");
         fall = Drop(1, 72);
         fall.Consume();
@@ -160,6 +162,8 @@ internal static class MaceMechanicsTests
         }
         Check(MaceMechanics.Knockback(0, 0, 0, 1) > 0, "normal mace strike still flings");
         Check(MaceMechanics.Knockback(10, 0, 0, 1) > MaceMechanics.Knockback(0, 0, 0, 1), "fall strengthens fling");
+        Near(MaceMechanics.Knockback(0,5,2,2),MaceMechanics.Knockback(0,0,2,2),0,"Density adds fall power instead of consuming the standing-hit force budget");
+        Check(MaceMechanics.Knockback(4,5,2,2)>MaceMechanics.Knockback(0,5,2,2)*1.4f,"Max-enchanted falling smash remains meaningfully stronger than a standing hit");
         Near(MaceMechanics.Knockback(float.MaxValue, int.MaxValue, int.MaxValue, float.MaxValue), 18, 0, "extreme forces clamp before arithmetic");
         Near(MaceMechanics.Knockback(5, -20, -20, -20), MaceMechanics.Knockback(5, 0, 0, 0.25f), 0, "negative force modifiers clamp to minimum");
         Near(MaceMechanics.WindLift(1.49f, 3), 0, 0, "Wind Burst requires smash fall");
@@ -182,6 +186,23 @@ internal static class MaceMechanicsTests
 
     private static void SegmentGeometry()
     {
+        Near(MaceMechanics.HitRadius(1,1,1),0.64f,0.0001f,"Hit radius includes mace-head width");
+        Near(MaceMechanics.HitRadius(0.5f,0.5f,1),0.32f,0.0001f,"Scaled-player hit radius is consistent");
+        Check(MaceMechanics.ClosestBodyZone(-1,0.85f,0,1,0.85f,0,0,0,0,1)==1,"Head-height swing selects upper body");
+        Check(MaceMechanics.ClosestBodyZone(-1,-0.85f,0,1,-0.85f,0,0,0,0,1)==-1,"Low swing selects lower body");
+        Check(MaceMechanics.ClosestBodyZone(-1,0,0,1,0,0,0,0,0,1)==0,"Torso-height swing keeps torso center");
+        for(int frame=0;frame<=16;frame++)
+        {
+            float y=-0.8f+frame*0.1f;
+            int zone=MaceMechanics.ClosestBodyZone(-1,y,0,1,y,0,0,0,0,1);
+            Check(MaceMechanics.SegmentDistanceSquared(-1,y,0,1,y,0,0,zone*0.35f,0)<=0.64f*0.64f,"Continuous target coverage has no gaps between head, torso and lower body");
+        }
+        Near(MaceMechanics.ImpulseVertical(-30,6),6,0,"Wind Burst reverses a fast descent into an upward rebound");
+        Near(MaceMechanics.ImpulseVertical(-2,4),4,0,"Grounded-target lift survives downward movement");
+        Near(MaceMechanics.ImpulseVertical(3,4),7,0,"Existing upward momentum is retained");
+        Near(MaceMechanics.ImpulseVertical(-3,0),-3,0,"Zero lift does not create a rebound");
+        Near(MaceMechanics.ImpulseVertical(float.NaN,4),0,0,"Invalid movement is rejected");
+        Near(MaceMechanics.ImpulseVertical(4,float.PositiveInfinity),0,0,"Invalid lift is rejected");
         Near(MaceMechanics.SegmentDistanceSquared(0, 0, 0, 2, 0, 0, 1, 3, 0), 9, 0.0001f, "interior segment projection");
         Near(MaceMechanics.SegmentDistanceSquared(0, 0, 0, 2, 0, 0, -2, 0, 0), 4, 0.0001f, "before segment endpoint");
         Near(MaceMechanics.SegmentDistanceSquared(0, 0, 0, 2, 0, 0, 4, 0, 0), 4, 0.0001f, "after segment endpoint");

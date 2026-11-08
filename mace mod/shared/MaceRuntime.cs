@@ -190,7 +190,7 @@ namespace MaceMod.Shared
             foreach(KeyValuePair<int,Peer> entry in peers) SamplePeer(entry.Key,entry.Value,position,size);
             Vector3 tip=MaceVisuals.HeadPosition(hand,profile.Scale,size);
             float now=Time.unscaledTime,dt=now-lastTipAt;
-            if(canAttack && hadTip && dt>0.001f && dt<0.15f && now>=nextSwing && (tip-lastTip).magnitude/dt>=1.1f*size)
+            if(canAttack && hadTip && dt>0.001f && dt<0.15f && now>=nextSwing && (tip-lastTip).magnitude/dt>=0.65f*size)
             {
                 foreach(KeyValuePair<int,Peer> entry in peers)
                 {
@@ -199,11 +199,12 @@ namespace MaceMod.Shared
                     float targetSize=RigScale(peer.Rig);
                     Vector3 body=Body(peer.Rig,targetSize);
                     if((position-body).sqrMagnitude>Mathf.Pow(Mathf.Min(4.5f,3.2f*size),2)) continue;
-                    float radius=0.55f*targetSize;
-                    if(Distance(lastTip,tip,body)>radius*radius || Blocked(tip,body,player)) continue;
+                    Vector3 hitCenter=HitCenter(lastTip,tip,body,targetSize);
+                    float radius=MaceMechanics.HitRadius(targetSize,size,profile.Scale);
+                    if(Distance(lastTip,tip,hitCenter)>radius*radius || Blocked(tip,hitCenter,player)) continue;
                     if(sequence==int.MaxValue) break;
                     Vector3 travel=tip-lastTip;
-                    Vector3 contact=lastTip+travel*Mathf.Clamp01(travel.sqrMagnitude>0.000001f ? Vector3.Dot(body-lastTip,travel)/travel.sqrMagnitude : 0);
+                    Vector3 contact=lastTip+travel*Mathf.Clamp01(travel.sqrMagnitude>0.000001f ? Vector3.Dot(hitCenter-lastTip,travel)/travel.sqrMagnitude : 0);
                     MaceHit hit=new MaceHit(session,entry.Key,peer.State.Session,sequence+1,PhotonNetwork.Time,fall.Blocks,contact.x,contact.y,contact.z);
                     outbound=hit;
                     if(transport.SendHit(hit,now)) { sequence++; nextSwing=now+0.8f; fall.Consume(); }
@@ -227,6 +228,11 @@ namespace MaceMod.Shared
         }
         private static float RigScale(VRRig rig) { return Safe(Mathf.Abs(rig.transform.lossyScale.x),1,0.2f,4); }
         private static Vector3 Body(VRRig rig,float size) { return rig.transform.position-Vector3.up*(0.2f*size); }
+        private static Vector3 HitCenter(Vector3 start,Vector3 end,Vector3 body,float size)
+        {
+            int zone=MaceMechanics.ClosestBodyZone(start.x,start.y,start.z,end.x,end.y,end.z,body.x,body.y,body.z,size);
+            return body+Vector3.up*(zone*0.35f*size);
+        }
         private static float Distance(Vector3 a,Vector3 b,Vector3 point)
         { return MaceMechanics.SegmentDistanceSquared(a.x,a.y,a.z,b.x,b.y,b.z,point.x,point.y,point.z); }
         private static bool Blocked(Vector3 tip,Vector3 body,GTPlayer player)
@@ -297,7 +303,9 @@ namespace MaceMod.Shared
             if(targetRig==null || targetState==null || !targetState.Enabled || !targetState.Receive || targetState.Session!=hit.TargetSession) return false;
             float size=RigScale(rig),targetSize=RigScale(targetRig);
             Vector3 point=new Vector3(hit.X,hit.Y,hit.Z),body=Body(targetRig,targetSize);
-            if((rig.transform.position-body).sqrMagnitude>Mathf.Pow(Mathf.Min(4.5f,3.2f*size),2) || (point-body).sqrMagnitude>Mathf.Pow(0.85f*targetSize,2) ||
+            Vector3 hitCenter=HitCenter(point,point,body,targetSize);
+            float radius=MaceMechanics.HitRadius(targetSize,size,state.Scale)+0.2f*size;
+            if((rig.transform.position-body).sqrMagnitude>Mathf.Pow(Mathf.Min(4.5f,3.2f*size),2) || (point-hitCenter).sqrMagnitude>radius*radius ||
                 Blocked(point,body,GTPlayer.Instance) || Blocked(rig.transform.position,point,GTPlayer.Instance)) return false;
             bool near=false;
             if(senderPlayer.IsLocal) near=outbound==hit && PhotonNetwork.Time-hit.Time<=0.55;
@@ -335,6 +343,7 @@ namespace MaceMod.Shared
             // A receipt must be queued before movement. Dropped/unpublished requests
             // never change infection or another client's body.
             if(!transport.SendReceipt(receipt)) return;
+            renderLog.LogInfo("Mace combat: received outcome="+outcome+" fall="+blocks.ToString("0.00")+" blocks density="+source.State.Density+" knockback="+source.State.Knockback+" wind="+source.State.WindBurst+" power="+source.State.Power.ToString("0.00"));
             if(defender!=null) defender.Commit();
             if(outcome==2)
             {
@@ -367,11 +376,13 @@ namespace MaceMod.Shared
             if(receipt.SourceActor==PhotonNetwork.LocalPlayer.ActorNumber && windSequence<hit.Sequence)
             {
                 windSequence=hit.Sequence;
+                float lift=0;
                 if(receipt.Outcome!=1 && published!=null)
                 {
-                    float lift=MaceMechanics.WindLift(hit.Blocks,published.WindBurst);
+                    lift=MaceMechanics.WindLift(hit.Blocks,published.WindBurst);
                     if(lift>0) ApplyVelocity(Vector3.up*lift);
                 }
+                renderLog.LogInfo("Mace combat: acknowledged outcome="+receipt.Outcome+" fall="+hit.Blocks.ToString("0.00")+" blocks windLift="+lift.ToString("0.00"));
                 Say(receipt.Outcome==1 ? "Their totem saved them" : receipt.Outcome==2 ? "Mace hit" : "Mace tag requested");
             }
             if(loaded) visuals.Impact(new Vector3(hit.X,hit.Y,hit.Z),receipt.Outcome==1,hit.Blocks);
@@ -381,7 +392,15 @@ namespace MaceMod.Shared
             GTPlayer player=GTPlayer.Instance;
             if(player==null || player.playerRigidBody==null) return;
             float size=Safe(player.scale,1,0.2f,4);
-            player.playerRigidBody.linearVelocity=Vector3.ClampMagnitude(player.playerRigidBody.linearVelocity+impulse*size,20*size);
+            Vector3 scaled=impulse*size;
+            if(!MaceMechanics.Finite(scaled.x) || !MaceMechanics.Finite(scaled.y) || !MaceMechanics.Finite(scaled.z) || scaled.sqrMagnitude<0.000001f) return;
+            Vector3 velocity=player.playerRigidBody.linearVelocity+scaled;
+            velocity.y=MaceMechanics.ImpulseVertical(player.playerRigidBody.linearVelocity.y,scaled.y);
+            velocity=Vector3.ClampMagnitude(velocity,20*size);
+            // The native knockback path releases grounded hands and marks the
+            // launch. Its velocity setter also updates locomotion history.
+            player.ApplyKnockback(scaled.normalized,scaled.magnitude,true);
+            player.SetPlayerVelocity(velocity);
         }
         private void Hide() { if(held!=null) UnityEngine.Object.Destroy(held); held=null; diagnosticAt=-1; }
         private void Reset()

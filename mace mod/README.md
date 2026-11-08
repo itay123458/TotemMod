@@ -1,4 +1,4 @@
-# PrimalCraft Mace Receiver 1.9.6
+# PrimalCraft Mace Receiver 1.9.7
 
 This standalone Gorilla Tag BepInEx 5 plugin receives authenticated developer mace hits and displays their Minecraft effects. The weapon can be equipped and configured only through PrimalCraft's authorized Developer menu. Installing this DLL grants receiver support; it does not grant weapon access.
 

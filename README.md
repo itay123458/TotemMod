@@ -4,7 +4,7 @@ Minecraft items and effects for Gorilla Tag, including totems and the mace.
 
 The existing DLL filenames, settings IDs and update URLs are retained so current installs keep working.
 
-Version **1.9.6** for PrimalCraft and its Mace receiver, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.9.7** for PrimalCraft and its Mace receiver, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
@@ -65,7 +65,9 @@ Swing the mace head into a participating player. Falling distance determines sma
 
 An **untagged attacker knocks the target back**. The target's own mod applies bounded local velocity. A **tagged attacker requests a native tag** unless the target has an equipped, charged totem and the current Totem rules permit protection. A save spends one charge after the acknowledged hit is published and plays the normal totem pop. The developer can use the mace as a guest: after a validated, acknowledged strike, the local attacker uses the game's ordinary `GameMode.ReportTag` path. The host applies native tag validation and cooldown through normal synchronization; the host does not need Mace Mod for this path. No host takeover is used.
 
-**Density 0–V** increases falling-hit strength, **Knockback 0–II** adds shove strength, and **Wind Burst 0–III** gives the attacker an upward rebound after a smash of at least 1.5 blocks. These are Gorilla Tag adaptations; there is no Minecraft armor system, so Breach is not included. Size, power, impact particles, sounds and opaque enchantment shimmer are configurable. The mace texture, critical-hit pixels and hit/smash/wind audio come from the local Minecraft installation. Enchantment reference: [Minecraft's Tricky Trials release notes](https://feedback.minecraft.net/hc/en-us/articles/27547857163917-Minecraft-Java-Edition-1-21-Tricky-Trials).
+**Density 0–V** increases the fall-dependent part of hit strength, **Knockback 0–II** adds shove strength, and **Wind Burst 0–III** gives the attacker an upward rebound after a smash of at least 1.5 blocks. Density gives no standing-hit bonus, leaving room for falling hits to become stronger. A landing preserves smash credit for 0.25 seconds; one hit consumes it. These are Gorilla Tag adaptations; there is no Minecraft armor system, so Breach is not included. Size, power, impact particles, sounds and opaque enchantment shimmer are configurable. The mace texture, critical-hit pixels and hit/smash/wind audio come from the local Minecraft installation. Enchantment reference: [Minecraft's Tricky Trials release notes](https://feedback.minecraft.net/hc/en-us/articles/27547857163917-Minecraft-Java-Edition-1-21-Tricky-Trials).
+
+Hit checks sweep the mace head across overlapping head, torso and lower-body zones, include its width, and accept slower swings. Receiver validation uses the same geometry. Movement uses the local game's knockback and velocity-history APIs, releases ground contact, and keeps the existing speed limit. Wind Burst produces upward motion even during a fast descent. Both players need the updated mod for the revised hit validation and target knockback.
 
 ## Totem protection
 

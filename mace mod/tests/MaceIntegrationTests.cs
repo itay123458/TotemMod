@@ -165,6 +165,12 @@ internal static class MaceIntegrationTests
     private static void LocalVelocity(ModuleDefinition module, TypeDefinition runtime)
     {
         MethodDefinition apply = Method(runtime, "ApplyVelocity");
+        Check(CallIndex(apply,"GorillaLocomotion.GTPlayer","ApplyKnockback")>=0,"Knockback must release ground contacts using the local game's knockback API");
+        Check(CallIndex(apply,"GorillaLocomotion.GTPlayer","SetPlayerVelocity")>=0,"Knockback must update locomotion velocity history");
+        Check(CallIndex(apply,"MaceMod.Shared.MaceMechanics","ImpulseVertical")>=0,"A falling smash must rebound upward instead of merely slowing descent");
+        int nativeKnockback=CallIndex(apply,"GorillaLocomotion.GTPlayer","ApplyKnockback");
+        Check(nativeKnockback>0 && apply.Body.Instructions[nativeKnockback-1].OpCode.Code==Code.Ldc_I4_1,"Native knockback must force the local hands off the ground");
+        Check(CallIndex(apply,"GorillaLocomotion.GTPlayer","SetPlayerVelocity")>nativeKnockback,"Commit bounded launch velocity after releasing ground contacts");
         int writes = 0;
         foreach (TypeDefinition type in Types(module))
         foreach (MethodDefinition method in type.Methods)
@@ -177,7 +183,7 @@ internal static class MaceIntegrationTests
                 { writes++; Check(method == apply, "All mace velocity writes occur only in ApplyVelocity"); }
             }
         }
-        Check(writes == 1, "Exactly one mace linearVelocity setter exists per plugin");
+        Check(writes == 0, "Mace movement must use native locomotion APIs instead of raw Rigidbody velocity writes");
         int localGetter = CallIndex(apply, "GorillaLocomotion.GTPlayer", "get_Instance");
         Check(localGetter >= 0, "ApplyVelocity obtains the local GTPlayer singleton");
         int localStore = localGetter + 1;
@@ -204,6 +210,8 @@ internal static class MaceIntegrationTests
     private static void CombatOrdering(TypeDefinition runtime)
     {
         MethodDefinition hit = Method(runtime, "ReceiveHit"), receipt = Method(runtime, "ReceiveReceipt");
+        Check(CallIndex(Method(runtime,"Tick"),runtime.FullName,"HitCenter")>=0,"Head and lower-body swings need the same target coverage as torso swings");
+        Check(CallIndex(Method(runtime,"Validate"),runtime.FullName,"HitCenter")>=0,"Receiver must validate against the same body coverage as the attacker");
         int validateHit = CallIndex(hit, runtime.FullName, "Validate"), send = CallIndex(hit, "MaceMod.Shared.MaceTransport", "SendReceipt");
         Check(send >= 0, "ReceiveHit publishes authenticated receipt");
         BooleanGuard(hit, validateHit, send, "ReceiveHit validation");

@@ -38,8 +38,8 @@ internal static class MaceVisualTests
                 "Standalone must not retain developer weapon controls: "+field.Name);
         bool version=false;
         foreach(CustomAttribute attribute in plugin.CustomAttributes)
-            if(attribute.AttributeType.FullName=="BepInEx.BepInPlugin" && attribute.ConstructorArguments.Count==3 && (string)attribute.ConstructorArguments[2].Value=="1.9.6") version=true;
-        Check(version,"Mace and Totem release versions must align at 1.9.6");
+            if(attribute.AttributeType.FullName=="BepInEx.BepInPlugin" && attribute.ConstructorArguments.Count==3 && (string)attribute.ConstructorArguments[2].Value=="1.9.7") version=true;
+        Check(version,"Mace and Totem release versions must align at 1.9.7");
         Check(Calls(Method(plugin,"Configure"),"Configure"),"Standalone must keep publishing receiver consent and effects");
         Check(Calls(Method(plugin,"Update"),"Tick"),"Standalone must keep the receiver runtime ticking");
     }
