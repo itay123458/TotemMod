@@ -1,40 +1,4 @@
-PRIMALCRAFT MACE RECEIVER 1.9.7 - LOCAL INSTALLATION
-
-1. Build with: & '.\mace mod\build.ps1'
-2. Close Gorilla Tag.
-3. Copy 'mace mod\artifacts\MaceMod.dll' into the game's BepInEx\plugins folder.
-4. Start the game with BepInEx 5 and Utilla installed. If the log says
-   "Utilla repair ready; restart Gorilla Tag", restart once before joining.
-   Installing the included TotemMod.UtillaFix.dll into BepInEx\patchers
-   before first launch avoids that extra restart.
-5. Join a private modded standard Infection / Tag room to receive compatible
-   authenticated developer mace hits.
-6. Press F8 for incoming-hit consent, particles, sound and update settings.
-
-Only PrimalCraft's authorized Developer menu equips or configures the mace.
-This standalone receiver grants no weapon access, controller/keyboard equip
-shortcut, equip button, enchantment controls or weapon size/power controls.
-Incoming hits default on; disable Receive developer mace hits to opt out.
-
-PrimalCraft is optional for receivers. Both plugins share one runtime when
-installed together, with the authorized Developer profile taking priority.
-Weapon equipment resets when changing rooms.
-
-AUTOMATIC UPDATES
-Keep the exact flat path BepInEx\plugins\MaceMod.dll. Renamed DLLs or nested
-plugin folders do not support automatic staging.
-Automatic updates default on: startup check after about 10 seconds, then
-once every six hours; failed checks retry after five minutes. Signed,
-verified updates are staged and installed on the next game launch by the
-automatically installed companion preloader.
-
-With PrimalCraft 1.9.2 or newer, use its single automatic-update switch and
-check button for both mods. Mace then shows "Updates managed by PrimalCraft"
-and performs no duplicate network check. Otherwise F8 has Mace's automatic
-update switch, status and Check for updates now button.
-To remove: close the game and delete MaceMod.dll from BepInEx\plugins.
-Settings live under BepInEx\config\macemod.gtag.rhys.cfg.
-
-Builds use verified Minecraft assets extracted locally without downloads.
-Do not redistribute the extracted assets or local DLL embedding them.
-This task has not installed the plugin, launched Gorilla Tag or published files.
+Mace has been removed in 1.9.8.
+Close Gorilla Tag and delete BepInEx\plugins\MaceMod.dll.
+Keep PrimalCraft and its updater helpers.
+Existing updaters can also replace the old mace with an inactive retirement DLL.

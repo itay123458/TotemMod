@@ -11,7 +11,7 @@ namespace TotemMod
 {
     public sealed partial class TotemPlugin
     {
-        internal const string ModVersion="1.9.7";
+        internal const string ModVersion="1.9.8";
         private ConfigEntry<bool> automaticUpdates;
         private ConfigEntry<float> updateIntervalMinutes;
         private Task<UpdateResult> updateTask;

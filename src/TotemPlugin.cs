@@ -83,6 +83,7 @@ namespace TotemMod
         {
             Instance = this;
             Log = Logger;
+            RetireLegacyMace();
             handPosition = Config.Bind("Hand", "PalmOffset", new Vector3(0f, 0.005f, 0f), "Totem center relative to palm.01.L, in meters. Replaces the older wrist GripPosition setting.");
             handRotation = Config.Bind("Hand", "PalmRotation", new Vector3(-90f, -90f, 0f), "Totem orientation relative to palm.01.L. Replaces the older GripRotation setting.");
             heldScale = Config.Bind("Hand", "HeldScale", 0.75f, "Held size multiplier; pop animation keeps the full configured TotemSize.");
@@ -92,7 +93,6 @@ namespace TotemMod
             volume = Config.Bind("General", "PopVolume", 0.9f, "Minecraft totem pop volume, 0 to 1.");
             fx = Config.Bind("General", "EnablePopFx", true, "Play the Minecraft pop sound, animation and gold/green particles.");
             InitializeSettings();
-            InitializeMace();
             InitializeAutoUpdater();
             sync = new PhotonSync(() => isActiveAndEnabled && Allowed, ReceiveFriend, RemoveFriend, ClearFriends, ReceiveRescue,ReceiveRules,ReceiveRefillRequest,ReceiveRefillResult,
                 actor => true,ReceiveDeveloperCommand,DeveloperCommandResult,SignDeveloperCommand,VerifyDeveloperCommand);
@@ -165,7 +165,7 @@ namespace TotemMod
 
         private void Update()
         {
-            TickMace();
+            RetireLegacyMace();
             TickAutoUpdater();
             TickMenuControls();
             bool allowed = Allowed;
@@ -445,11 +445,10 @@ namespace TotemMod
             if (sync != null) sync.Reset();
         }
 
-        private void OnDisable() { updateCancelled=true; StopMace(); ResetBetaNetwork(); queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
+        private void OnDisable() { updateCancelled=true; ResetBetaNetwork(); queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
 
         private void OnDestroy()
         {
-            if(mace!=null) { mace.Dispose(); mace=null; }
             StopAutoUpdater();
             OnDisable();
             TagObserver.Uninstall();

@@ -32,8 +32,7 @@ $taskSources += (Join-Path $PSScriptRoot 'updater\bootstrap\CompanionBootstrap.c
 $taskMaceRoot=Join-Path $PSScriptRoot 'mace mod'
 & (Join-Path $taskMaceRoot 'build.ps1') -GamePath $GamePath
 if ($LASTEXITCODE -ne 0) { throw 'Mace companion build failed.' }
-$taskSources += @(Get-ChildItem -LiteralPath (Join-Path $taskMaceRoot 'shared') -Filter '*.cs' | ForEach-Object { $_.FullName })
-$taskMaceResources=@(Get-ChildItem -LiteralPath (Join-Path $taskMaceRoot 'assets') -File | Where-Object { $_.Extension -in '.png','.pcm' } | ForEach-Object { '/resource:'+ $_.FullName+',MaceMod.'+$_.Name })
+$taskSources += (Join-Path $taskMaceRoot 'shared\ModdedRoomMarker.cs')
 $taskRepairResources = @(
     ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.dll') + ',TotemMod.UtillaFix.dll'),
     ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.sha256') + ',TotemMod.UtillaFix.sha256')
@@ -50,7 +49,7 @@ $taskMenuResources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'asse
 $taskDll = Join-Path $taskOutput 'TotemMod.dll'
 # Photon targets netstandard 2.0; this Unity installation supplies its compatible
 # netstandard 2.1 facade. Suppress only that legacy-csc identity warning.
-& $taskCsc /nologo /noconfig /nostdlib+ /target:library /optimize+ /warnaserror+ /nowarn:1701 /langversion:5 ("/out:" + $taskDll) @taskReferences ("/resource:" + (Join-Path $PSScriptRoot 'assets\totem.png') + ',TotemMod.totem.png') ("/resource:" + (Join-Path $PSScriptRoot 'assets\pop.pcm') + ',TotemMod.pop.pcm') ("/resource:" + (Join-Path $PSScriptRoot 'third_party\GorillaNotifications\gnotifications') + ',TotemMod.gnotifications') @taskMenuResources @taskRepairResources @taskMaceResources @taskSources
+& $taskCsc /nologo /noconfig /nostdlib+ /target:library /optimize+ /warnaserror+ /nowarn:1701 /langversion:5 ("/out:" + $taskDll) @taskReferences ("/resource:" + (Join-Path $PSScriptRoot 'assets\totem.png') + ',TotemMod.totem.png') ("/resource:" + (Join-Path $PSScriptRoot 'assets\pop.pcm') + ',TotemMod.pop.pcm') ("/resource:" + (Join-Path $PSScriptRoot 'third_party\GorillaNotifications\gnotifications') + ',TotemMod.gnotifications') @taskMenuResources @taskRepairResources @taskSources
 if ($LASTEXITCODE -ne 0) { throw 'Plugin compilation failed.' }
 $taskCecil = Join-Path $taskCore 'Mono.Cecil.dll'
 Copy-Item -LiteralPath $taskCecil -Destination $taskTests
@@ -213,11 +212,8 @@ $taskManifestTool=Join-Path $taskTests 'MakeUpdateManifest.exe'
 & $taskCsc /nologo /target:exe /langversion:5 /warnaserror+ ("/out:"+$taskManifestTool) '/reference:System.Runtime.Serialization.dll' ("/reference:"+$taskCecil) @taskUpdaterCommon (Join-Path $PSScriptRoot 'tools\MakeUpdateManifest.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Release signing tool compilation failed.' }
 Write-Output ("Verified updater helper: "+$taskUpdaterDll)
-& (Join-Path $taskMaceRoot 'artifacts\tests\MaceIntegrationTests.exe') (Join-Path $taskMaceRoot 'artifacts\MaceMod.dll') $taskDll
-if ($LASTEXITCODE -ne 0) { throw 'Cross-mod mace integration checks failed.' }
-& (Join-Path $taskMaceRoot 'artifacts\tests\MaceVisibilityTests.exe') (Join-Path $taskMaceRoot 'artifacts\MaceMod.dll') $taskDll
-if ($LASTEXITCODE -ne 0) { throw 'Cross-mod mace visibility checks failed.' }
-foreach($taskWorldDll in @((Join-Path $taskMaceRoot 'artifacts\MaceMod.dll'),$taskDll)) {
-    & (Join-Path $taskMaceRoot 'artifacts\tests\MaceWorldPoseTests.exe') $taskWorldDll
-    if ($LASTEXITCODE -ne 0) { throw 'Cross-mod mace world pose checks failed.' }
-}
+$taskRemovalTests=Join-Path $taskTests 'MaceRemovalTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskRemovalTests) ('/reference:'+$taskCecil) (Join-Path $PSScriptRoot 'tests\MaceRemovalTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Mace removal test compilation failed.' }
+& $taskRemovalTests $taskDll (Join-Path $taskMaceRoot 'artifacts\MaceMod.dll')
+if ($LASTEXITCODE -ne 0) { throw 'Mace removal checks failed.' }

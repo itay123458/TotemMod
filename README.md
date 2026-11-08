@@ -1,16 +1,16 @@
 # PrimalCraft
 
-Minecraft items and effects for Gorilla Tag, including totems and the mace.
+Minecraft totems, effects and VR settings for Gorilla Tag.
 
 The existing DLL filenames, settings IDs and update URLs are retained so current installs keep working.
 
-Version **1.9.7** for PrimalCraft and its Mace receiver, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.9.8** for PrimalCraft, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
 ## Install and controls
 
-Close Gorilla Tag, download the release ZIP and extract it into the Gorilla Tag folder. It installs `BepInEx/plugins/TotemMod.dll` plus `TotemMod.Updater.dll`, `TotemMod.CompanionUpdater.dll` and `TotemMod.UtillaFix.dll` under `BepInEx/patchers`. The separate Mace ZIP installs MaceMod.dll and its required patchers. BepInEx and Utilla are required separately. Keep one copy of each plugin. Restart after replacing DLLs and create a new private Modded Infection room. Source builders get the Totem DLLs in `artifacts/` and MaceMod.dll under `mace mod/artifacts/`.
+Close Gorilla Tag, download the release ZIP and extract it into the Gorilla Tag folder. It installs `BepInEx/plugins/TotemMod.dll` plus `TotemMod.Updater.dll`, `TotemMod.CompanionUpdater.dll` and `TotemMod.UtillaFix.dll` under `BepInEx/patchers`. BepInEx and Utilla are required separately. Keep one copy of each plugin. Restart after replacing DLLs and create a new private Modded Infection room. Source builders get the Totem DLLs in `artifacts/`.
 
 - **Y:** equip or unequip. Unequipping spends nothing. A pop spends one totem; release and press again for another.
 - **Hold X** (default 0.6 seconds), or **F7:** open/close settings.
@@ -35,7 +35,7 @@ The developer has six top-level categories and 26 named pages. Approved Beta acc
 | Effects | Particles, Sound and Motion, Friends and Quality, Effect Presets: amount/size/spread/colors/shape/brightness/spin; sound volume/pitch; animation style/speed/distance/height; friend range/render scale/sounds; haptics; six local effect presets and preview. |
 | Interface | Menu and Pointer, HUD, HUD Position, Notices and Controls, Updates: pointer/HUD preferences, local controls, resets, automatic updates, interval, check now, status and pending-update cancellation. |
 | Beta | PrimalCraftel, Tint and Motion, Model Orientation, Experiments: selectable player avatar, crystal/block/star, tint/rainbow, scale, spin, bob, rotation, pop appearance, snapshot refresh and experimental presets. |
-| Dev | Mace and Enchantments, Mace Effects, Beta Access, Local Tools, Room Control, Practice Shortcuts, Reset and Diagnostics: all developer tools are inside this single account-only category. |
+| Dev | Beta Access, Local Tools, Room Control, Practice Shortcuts, Reset and Diagnostics: all developer tools are inside this single account-only category. |
 
 Minecraft's actual menu textures and click come from the local installation. Sliders show pending developer room changes while awaiting the host. Intermediate slider values coalesce; pending actions are canceled on host or room changes.
 
@@ -53,21 +53,11 @@ The Beta category and outgoing Beta appearance require the developer account, an
 
 Other experiments include recoloring the classic totem, crystal/block/star shapes, original player colors or RGB tint, rainbow speed, held spin/bob, model orientation, and using the chosen model during your pop. Mini Me, Emerald Crystal, Rainbow Star and Golden Block presets are included. Disable Beta or choose Return to Classic to undo the experiments.
 
-## Minecraft mace
+## Mace removed
 
-The separate receiver mod lives in `mace mod/` and builds to `mace mod/artifacts/MaceMod.dll`. It needs BepInEx and Utilla; it does not require PrimalCraft to receive hits. **F8** opens incoming-hit, particle and sound preferences. **Only the developer can equip a mace, and only from PrimalCraft's Dev / Mace and Enchantments page.** B, M and desktop equip controls are removed. The developer's authenticated Steam account and private signing key are required; editing a config or becoming room master does not unlock the weapon.
+The mace, enchantments, Wind Burst, fling mechanics and mace menu pages have been removed in 1.9.8. Existing MaceMod.dll installs receive an inactive retirement update through the signed updater. PrimalCraft also disables an older mace companion if only the main plugin has updated. No mace code or assets are embedded in the main plugin.
 
-Equipping shows the mace immediately in the right hand, including while the Dev menu is open. The button changes to Unequip and the status explains that menu-open hits are paused. Close the menu to swing; movement from the menu is not reused as an attack. Mace meshes choose a layer visible to the local camera instead of inheriting the offline-hand layer.
-
-Mace hits work only in **private modded standard Infection / Tag**, between users running Mace Mod 1.0.1 or PrimalCraft 1.9.1 or newer. The new protocol rejects unsigned equipped states and binds the developer's proof to their actual account, room, actor, session, state and revision. Old unrestricted mace clients cannot attack updated receivers. Receiving hits can be disabled in the active mod's settings. When both mods are installed, one shared runtime handles peer messages, effects and physics. The developer's PrimalCraft settings take priority; other accounts use standalone receiver settings when installed.
-
-Swing the mace head into a participating player. Falling distance determines smash strength: one block equals one meter at normal player scale. Grounding, new ascent, teleports, stale samples and completed hits clear old fall credit. Hit geometry, recent swing history, range, walls, current opt-in, fresh sessions and message order are checked again by the recipient.
-
-An **untagged attacker knocks the target back**. The target's own mod applies bounded local velocity. A **tagged attacker requests a native tag** unless the target has an equipped, charged totem and the current Totem rules permit protection. A save spends one charge after the acknowledged hit is published and plays the normal totem pop. The developer can use the mace as a guest: after a validated, acknowledged strike, the local attacker uses the game's ordinary `GameMode.ReportTag` path. The host applies native tag validation and cooldown through normal synchronization; the host does not need Mace Mod for this path. No host takeover is used.
-
-**Density 0–V** increases the fall-dependent part of hit strength, **Knockback 0–II** adds shove strength, and **Wind Burst 0–III** gives the attacker an upward rebound after a smash of at least 1.5 blocks. Density gives no standing-hit bonus, leaving room for falling hits to become stronger. A landing preserves smash credit for 0.25 seconds; one hit consumes it. These are Gorilla Tag adaptations; there is no Minecraft armor system, so Breach is not included. Size, power, impact particles, sounds and opaque enchantment shimmer are configurable. The mace texture, critical-hit pixels and hit/smash/wind audio come from the local Minecraft installation. Enchantment reference: [Minecraft's Tricky Trials release notes](https://feedback.minecraft.net/hc/en-us/articles/27547857163917-Minecraft-Java-Edition-1-21-Tricky-Trials).
-
-Hit checks sweep the mace head across overlapping head, torso and lower-body zones, include its width, and accept slower swings. Receiver validation uses the same geometry. Movement uses the local game's knockback and velocity-history APIs, releases ground contact, and keeps the existing speed limit. Wind Burst produces upward motion even during a fast descent. Both players need the updated mod for the revised hit validation and target knockback.
+You can delete `BepInEx/plugins/MaceMod.dll` while Gorilla Tag is closed. Keep the shared updater helpers, which are still used by PrimalCraft. The old source is retained locally for reference and is not compiled into this release.
 
 ## Totem protection
 
@@ -99,7 +89,7 @@ The private-room patch advertises native Infection and keeps explicit modded opt
 
 The included preloader repairs the supported old Utilla automatically before plugins load. It creates an exact backup outside the plugins directory under `BepInEx/cache/TotemModUtilla/backups/`, then atomically replaces the DLL with the compatibility fix. It also finds nested Utilla installs. Already fixed copies stay unchanged. Unknown versions, duplicate Utilla plugins, locked files and a different game build are retained with a log message. Nothing deletes the old DLL before a replacement is ready. Utilla settings remain intact.
 
-Updated Totem/Mace clients also recognize the explicit private Modded Infection marker when an older Utilla misses its join callback. This fallback requires the exact marker and canonical private Infection wire format; ordinary/public rooms are rejected. Other mods still need their own compatible Utilla callbacks.
+PrimalCraft also recognizes the explicit private Modded Infection marker when an older Utilla misses its join callback. This fallback requires the exact marker and canonical private Infection wire format; ordinary/public rooms are rejected. Other mods still need their own compatible Utilla callbacks.
 
 When receiving only TotemMod.dll through the automatic updater, its first launch installs the repair helper. **Restart once more** to apply the Utilla repair. Extracting the full ZIP installs the helper immediately. No additional download or redistributed Utilla binary is required: the helper patches the verified installed original using the included compatibility code.
 
@@ -107,9 +97,9 @@ The creator/host needs patched Utilla and a **new private Modded Infection room*
 
 ## Automatic updates
 
-Automatic updates are on by default. Totem checks its own release and the installed standalone Mace DLL from the same public GitHub release feed shortly after startup, then every six hours by default. Failed checks retry after five minutes. Configure both under **Interface / Updates**, or check manually there. No GitHub login is needed to receive updates. Mace is updated only if installed; Totem does not add the standalone plugin when it is absent.
+Automatic updates are on by default. PrimalCraft checks its own release and any installed legacy Mace DLL from the same public GitHub release feed shortly after startup, then every six hours by default. Failed checks retry after five minutes. Configure both under **Interface / Updates**, or check manually there. No GitHub login is needed to receive updates. Mace is updated only if installed; Totem does not add the standalone plugin when it is absent.
 
-Mace-only installs have their own startup/six-hour automatic check and F8 update controls. When Totem 1.9.2 or newer is installed, Totem manages both products and Mace skips duplicate checks. Both release versions now match. Each DLL uses a separate signed manifest, fixed asset name, plugin identity and signature domain, so one product cannot be substituted for the other.
+Old mace-only builds can download the signed inactive retirement update through their existing updater. The retired plugin has no receiver, physics, rendering, menu or update loop. PrimalCraft continues checking for signed updates normally.
 
 New versions must have a valid publisher RSA signature, exact DLL hash/size, expected plugin identity/version and matching tested game build. Downloads are bounded and HTTPS-only. Running plugins stage verified files without replacing loaded DLLs. At the next game launch, the shared companion preloader checks each queue again and atomically installs updates before either plugin loads. Previous DLLs remain outside plugins in `BepInEx/cache/TotemModUpdater/backups/` and `BepInEx/cache/MaceModUpdater/backups/`. A failed product update retains that product's old DLL and does not stop the other queue from being checked.
 
@@ -117,7 +107,7 @@ The first DLL-only upgrade to 1.9.2 installs the companion helper automatically.
 
 An old mod build without download-checking code cannot bootstrap from the preloader DLL alone: the helper installs already-staged files. Replace that old mod DLL once with the current release, then leave Automatic updates enabled. Manual Check GitHub now bypasses the periodic waiting interval; downloaded updates still apply on restart.
 
-Network failures, bad signatures, corrupt files, downgrades, unsupported helper versions and game mismatches retain the installed plugin. Old pending files for an incompatible game are cleared on the next check so a compatible release can be discovered. The signed updater changes Totem and installed Mace only; the separate repair helper handles the supported Utilla fix described above. Neither changes game assemblies, personal settings or developer keys. Future supported releases of both mods update automatically.
+Network failures, bad signatures, corrupt files, downgrades, unsupported helper versions and game mismatches retain the installed plugin. Old pending files for an incompatible game are cleared on the next check so a compatible release can be discovered. The signed updater changes Totem and installed Mace only; the separate repair helper handles the supported Utilla fix described above. Neither changes game assemblies, personal settings or developer keys. Future supported PrimalCraft releases update automatically.
 
 To publish a new version as the repository owner, change `ModVersion` in `src/AutoUpdateSettings.cs`, update the README and run `tools/publish-release.ps1 -Publish`. It builds/tests, signs the manifest locally, packages an explicit source allowlist, preserves repository history and publishes a new immutable version tag. The update-signing key stays under `%USERPROFILE%/.totemmod/update-signing-private.xml`; it is separate from the developer-command key and must remain private. Neither key is in GitHub or the release ZIP.
 

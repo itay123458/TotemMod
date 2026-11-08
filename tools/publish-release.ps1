@@ -81,7 +81,7 @@ Copy-Item -LiteralPath $releaseUtillaFix -Destination (Join-Path $releaseMacePac
 Copy-Item -LiteralPath $releaseCompanionHelper -Destination (Join-Path $releaseMacePackage 'BepInEx\patchers\TotemMod.CompanionUpdater.dll')
 Copy-Item -LiteralPath (Join-Path $releaseMaceSource 'README.md') -Destination (Join-Path $releaseMacePackage 'README.md')
 Copy-Item -LiteralPath (Join-Path $releaseRepo 'LICENSE') -Destination (Join-Path $releaseMacePackage 'LICENSE')
-$releaseMaceZip=Join-Path $releaseArtifacts ('MaceMod-for-'+$releaseVersion+'.zip')
+$releaseMaceZip=Join-Path $releaseArtifacts ('MaceRemoval-'+$releaseVersion+'.zip')
 Compress-Archive -Path (Join-Path $releaseMacePackage '*') -DestinationPath $releaseMaceZip -Force
 $releaseNotes=Join-Path $releaseWork 'release-notes.md'
 if ($NotesFile) { Copy-Item -LiteralPath $NotesFile -Destination $releaseNotes }
