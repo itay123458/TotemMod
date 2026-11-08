@@ -87,7 +87,7 @@ namespace MaceMod.Shared
         {
             Load();
             GameObject item=new GameObject(name);
-            item.transform.SetParent(parent,false);
+            item.transform.SetParent(effects.transform,false);
             Camera camera=GorillaTagger.Instance!=null && GorillaTagger.Instance.mainCamera!=null ? GorillaTagger.Instance.mainCamera.GetComponent<Camera>() : null;
             if(camera==null) camera=Camera.main;
             item.layer=MacePresentation.Layer(camera!=null ? camera.cullingMask : -1);
@@ -96,13 +96,12 @@ namespace MaceMod.Shared
             return item;
         }
 
-        public void Pose(GameObject item,Transform rightHand,float scale,bool glint,float time)
+        public void Pose(GameObject item,Transform rightHand,float weaponScale,bool glint,float time,float playerScale=1f)
         {
             if(item==null || rightHand==null || disposed) return;
-            scale=SafeScale(scale);
-            if(item.transform.parent!=rightHand) item.transform.SetParent(rightHand,false);
-            item.transform.localPosition=GripOffset*scale;
-            item.transform.localRotation=GripRotation;
+            float scale=SafeScale(weaponScale)*SafePlayerScale(playerScale);
+            item.transform.position=rightHand.position+rightHand.rotation*(GripOffset*scale);
+            item.transform.rotation=rightHand.rotation*GripRotation;
             item.transform.localScale=Vector3.one*scale;
             // An opaque property tint preserves every original surface and depth write.
             // No transparent shell or second pass can reveal inner/back surfaces.
@@ -113,12 +112,38 @@ namespace MaceMod.Shared
             item.GetComponent<MeshRenderer>().SetPropertyBlock(tint);
         }
 
-        public static Vector3 HeadPosition(Transform rightHand,float scale)
+        public static Vector3 HeadPosition(Transform rightHand,float weaponScale,float playerScale=1f)
         {
             if(rightHand==null) return Vector3.zero;
-            return rightHand.TransformPoint((GripOffset+GripRotation*HeadLocal)*SafeScale(scale));
+            float scale=SafeScale(weaponScale)*SafePlayerScale(playerScale);
+            Vector3 grip=rightHand.position+rightHand.rotation*(GripOffset*scale);
+            return grip+(rightHand.rotation*GripRotation)*(HeadLocal*scale);
         }
 
+        // Main-thread, one-shot troubleshooting only. The owner logs this after
+        // equipment creation; no render/update hot path invokes diagnostics.
+        public string Diagnostics(GameObject item,Transform hand)
+        {
+            if(item==null) return "Mace render: item=null";
+            Transform transform=item.transform;
+            MeshRenderer renderer=item.GetComponent<MeshRenderer>();
+            Material shared=renderer!=null?renderer.sharedMaterial:null;
+            Shader shader=shared!=null?shared.shader:null;
+            Bounds bounds=renderer!=null?renderer.bounds:new Bounds(transform.position,Vector3.zero);
+            Camera taggerCamera=GorillaTagger.Instance!=null && GorillaTagger.Instance.mainCamera!=null ? GorillaTagger.Instance.mainCamera.GetComponent<Camera>() : null;
+            Camera camera=taggerCamera!=null?taggerCamera:Camera.main;
+            Vector3 viewport=camera!=null?camera.WorldToViewportPoint(bounds.center):Vector3.zero;
+            return "Mace render: active="+item.activeSelf+"/"+item.activeInHierarchy+
+                " parent="+(transform.parent!=null?transform.parent.name:"none")+
+                " hand="+(hand!=null?hand.name:"none")+
+                " position="+transform.position.ToString("F3")+" scale="+transform.lossyScale.ToString("F3")+
+                " boundsCenter="+bounds.center.ToString("F3")+" boundsSize="+bounds.size.ToString("F3")+
+                " renderer="+(renderer!=null?renderer.enabled.ToString():"none")+" visible="+(renderer!=null && renderer.isVisible)+
+                " shader="+(shader!=null?shader.name:"none")+" supported="+(shader!=null && shader.isSupported)+
+                " layer="+item.layer+" taggerMask="+(taggerCamera!=null?taggerCamera.cullingMask.ToString("X8"):"none")+
+                " camera="+(camera!=null?camera.name:"none")+" cameraActive="+(camera!=null && camera.isActiveAndEnabled)+
+                " viewport="+viewport.ToString("F3");
+        }
         public void Impact(Vector3 position,bool blocked,float blocks)
         {
             if(!loaded || disposed) return;
@@ -172,6 +197,7 @@ namespace MaceMod.Shared
             voice.Stop(); voice.transform.position=position; voice.clip=clip; voice.volume=volume; voice.Play();
         }
         private static float SafeScale(float scale) { return float.IsNaN(scale)||float.IsInfinity(scale)?1f:Mathf.Clamp(scale,0.5f,1.5f); }
+        private static float SafePlayerScale(float scale) { return float.IsNaN(scale)||float.IsInfinity(scale)?1f:Mathf.Clamp(scale,0.2f,4f); }
         private static void SetRenderer(MeshRenderer renderer,Material value)
         {
             renderer.sharedMaterial=value; renderer.shadowCastingMode=ShadowCastingMode.Off;

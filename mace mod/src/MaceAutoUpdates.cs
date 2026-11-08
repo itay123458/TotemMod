@@ -12,7 +12,7 @@ namespace MaceMod
 {
     public sealed partial class MacePlugin
     {
-        internal const string MaceVersion="1.9.3";
+        internal const string MaceVersion="1.9.4";
         private const float MaceUpdateInterval=6f*60f*60f;
         private static readonly Version MaceUpdaterVersion=new Version(MaceVersion);
         private static readonly Version TotemMaceManagerVersion=new Version(1,9,2);

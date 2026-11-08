@@ -26,6 +26,7 @@ namespace MaceMod.Shared
             internal MaceState State;
             internal readonly MaceFall Fall=new MaceFall();
             internal VRRig Rig;
+            internal readonly MaceHandAnchor Hand=new MaceHandAnchor();
             internal float NextRig;
             internal GameObject Item;
             internal readonly Vector3[] Tips=new Vector3[12];
@@ -41,6 +42,9 @@ namespace MaceMod.Shared
         private readonly MaceTransport transport;
         private readonly MaceVisuals visuals=new MaceVisuals();
         private readonly MaceFall fall=new MaceFall();
+        private readonly MaceHandAnchor localHand=new MaceHandAnchor();
+        private readonly BepInEx.Logging.ManualLogSource renderLog=BepInEx.Logging.Logger.CreateLogSource("MaceRender");
+        private float diagnosticAt=-1;
         private Room room;
         private string session;
         private MaceState published;
@@ -57,6 +61,7 @@ namespace MaceMod.Shared
         {
             transport=new MaceTransport(Allowed,ReceiveState,ReceiveHit,ReceiveReceipt,RemovePeer,SignState,TotemMod.DeveloperIdentity.Verify);
             Bus["attach"]=new Func<string,Func<bool>,Func<bool>,Action<string>,Action,Func<bool>,Func<byte[],byte[]>,IDictionary<string,object>>(Attach);
+            Application.onBeforeRender+=Render;
         }
         private IDictionary<string,object> Attach(string owner,Func<bool> allowed,Func<bool> save,Action<string> notice,Action commit,Func<bool> authorizeEquip,Func<byte[],byte[]> sign)
         {
@@ -159,7 +164,8 @@ namespace MaceMod.Shared
             transport.Tick(published,Time.unscaledTime);
             GTPlayer player=GTPlayer.Instance;
             VRRig local=GorillaTagger.Instance!=null ? GorillaTagger.Instance.offlineVRRig : null;
-            if(player==null || local==null || local.rightHandTransform==null) { Hide(); hadTip=false; return; }
+            Transform hand=localHand.Resolve(local);
+            if(player==null || local==null || hand==null) { Hide(); hadTip=false; return; }
             float size=Safe(player.scale,1,0.2f,4);
             Vector3 position=player.headCollider!=null ? player.headCollider.transform.position : local.transform.position;
             bool grounded=player.IsHandTouching(true)||player.IsHandTouching(false);
@@ -174,13 +180,15 @@ namespace MaceMod.Shared
                 visuals.ParticlesEnabled=profile.Particles; visuals.SoundEnabled=profile.Sound; visuals.Tick(Time.unscaledTime);
                 if(visible)
                 {
-                    if(held==null) { held=visuals.Create(local.rightHandTransform,"Mace (held)"); Say("Mace ready on right hand"); }
-                    visuals.Pose(held,local.rightHandTransform,profile.Scale,profile.Glint && profile.Density+profile.Knockback+profile.Wind>0,Time.unscaledTime);
+                    if(held==null) { held=visuals.Create(hand,"Mace (held)"); diagnosticAt=Time.unscaledTime+0.5f; Say("Mace ready on right hand"); }
+                    visuals.Pose(held,hand,profile.Scale,profile.Glint && profile.Density+profile.Knockback+profile.Wind>0,Time.unscaledTime,size);
+                    if(diagnosticAt>=0 && Time.unscaledTime>=diagnosticAt)
+                    { diagnosticAt=-1; renderLog.LogInfo(visuals.Diagnostics(held,hand)); }
                 }
                 else Hide();
             }
             foreach(KeyValuePair<int,Peer> entry in peers) SamplePeer(entry.Key,entry.Value,position,size);
-            Vector3 tip=MaceVisuals.HeadPosition(local.rightHandTransform,profile.Scale);
+            Vector3 tip=MaceVisuals.HeadPosition(hand,profile.Scale,size);
             float now=Time.unscaledTime,dt=now-lastTipAt;
             if(canAttack && hadTip && dt>0.001f && dt<0.15f && now>=nextSwing && (tip-lastTip).magnitude/dt>=1.1f*size)
             {
@@ -205,6 +213,18 @@ namespace MaceMod.Shared
             }
             lastTip=tip; lastTipAt=now; hadTip=canAttack;
         }
+        private void Render()
+        {
+            if(disposed || !loaded || !Allowed()) return;
+            Client profile=Profile();
+            VRRig local=GorillaTagger.Instance!=null ? GorillaTagger.Instance.offlineVRRig : null;
+            GTPlayer player=GTPlayer.Instance;
+            if(held!=null && profile!=null && player!=null)
+                visuals.Pose(held,localHand.Resolve(local),profile.Scale,profile.Glint && profile.Density+profile.Knockback+profile.Wind>0,Time.unscaledTime,Safe(player.scale,1,0.2f,4));
+            foreach(Peer peer in peers.Values)
+                if(peer.Item!=null && peer.Rig!=null && peer.State!=null)
+                    visuals.Pose(peer.Item,peer.Hand.Resolve(peer.Rig),peer.State.Scale,peer.State.Density+peer.State.Knockback+peer.State.WindBurst>0,Time.unscaledTime,RigScale(peer.Rig));
+        }
         private static float RigScale(VRRig rig) { return Safe(Mathf.Abs(rig.transform.lossyScale.x),1,0.2f,4); }
         private static Vector3 Body(VRRig rig,float size) { return rig.transform.position-Vector3.up*(0.2f*size); }
         private static float Distance(Vector3 a,Vector3 b,Vector3 point)
@@ -227,17 +247,18 @@ namespace MaceMod.Shared
             if(!steady) peer.StillAt=now;
             peer.Fall.Update(height,now,steady && now-peer.StillAt>0.13f,size);
             peer.LastHeight=height; peer.LastSample=now;
-            if(peer.State!=null && peer.Rig.rightHandTransform!=null)
+            Transform hand=peer.Hand.Resolve(peer.Rig);
+            if(peer.State!=null && hand!=null)
             {
-                Vector3 tip=MaceVisuals.HeadPosition(peer.Rig.rightHandTransform,peer.State.Scale);
+                Vector3 tip=MaceVisuals.HeadPosition(hand,peer.State.Scale,size);
                 int latest=(peer.Cursor+peer.Tips.Length-1)%peer.Tips.Length;
                 if(peer.Count==0 || now-peer.Times[latest]>=0.033f)
                 { peer.Tips[peer.Cursor]=tip; peer.Times[peer.Cursor]=now; peer.Cursor=(peer.Cursor+1)%peer.Tips.Length; peer.Count=Math.Min(peer.Tips.Length,peer.Count+1); }
                 bool visible=loaded && peer.State.Enabled && peer.State.Equipped && (localPosition-peer.Rig.transform.position).sqrMagnitude<225*localScale*localScale;
                 if(visible)
                 {
-                    if(peer.Item==null) peer.Item=visuals.Create(peer.Rig.rightHandTransform,"Friend mace");
-                    visuals.Pose(peer.Item,peer.Rig.rightHandTransform,peer.State.Scale,peer.State.Density+peer.State.Knockback+peer.State.WindBurst>0,now);
+                    if(peer.Item==null) peer.Item=visuals.Create(hand,"Friend mace");
+                    visuals.Pose(peer.Item,hand,peer.State.Scale,peer.State.Density+peer.State.Knockback+peer.State.WindBurst>0,now,size);
                 }
                 else if(peer.Item!=null) { UnityEngine.Object.Destroy(peer.Item); peer.Item=null; }
             }
@@ -362,7 +383,7 @@ namespace MaceMod.Shared
             float size=Safe(player.scale,1,0.2f,4);
             player.playerRigidBody.linearVelocity=Vector3.ClampMagnitude(player.playerRigidBody.linearVelocity+impulse*size,20*size);
         }
-        private void Hide() { if(held!=null) UnityEngine.Object.Destroy(held); held=null; }
+        private void Hide() { if(held!=null) UnityEngine.Object.Destroy(held); held=null; diagnosticAt=-1; }
         private void Reset()
         {
             if(room==null && session==null && held==null && peers.Count==0) return;
@@ -373,7 +394,8 @@ namespace MaceMod.Shared
         private void Detach(string token)
         {
             clients.Remove(token); if(clients.Count!=0 || disposed) return;
-            disposed=true; Reset(); transport.Dispose(); visuals.Dispose();
+            disposed=true; Application.onBeforeRender-=Render; Reset(); transport.Dispose(); visuals.Dispose();
+            BepInEx.Logging.Logger.Sources.Remove(renderLog); renderLog.Dispose();
             if(ReferenceEquals(AppDomain.CurrentDomain.GetData(MaceClient.Slot),Bus)) AppDomain.CurrentDomain.SetData(MaceClient.Slot,null);
         }
     }

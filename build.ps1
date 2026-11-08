@@ -217,3 +217,7 @@ Write-Output ("Verified updater helper: "+$taskUpdaterDll)
 if ($LASTEXITCODE -ne 0) { throw 'Cross-mod mace integration checks failed.' }
 & (Join-Path $taskMaceRoot 'artifacts\tests\MaceVisibilityTests.exe') (Join-Path $taskMaceRoot 'artifacts\MaceMod.dll') $taskDll
 if ($LASTEXITCODE -ne 0) { throw 'Cross-mod mace visibility checks failed.' }
+foreach($taskWorldDll in @((Join-Path $taskMaceRoot 'artifacts\MaceMod.dll'),$taskDll)) {
+    & (Join-Path $taskMaceRoot 'artifacts\tests\MaceWorldPoseTests.exe') $taskWorldDll
+    if ($LASTEXITCODE -ne 0) { throw 'Cross-mod mace world pose checks failed.' }
+}

@@ -1,6 +1,6 @@
 # Totem Mod
 
-Version **1.9.3** for both Totem Mod and Mace Mod, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.9.4** for both Totem Mod and Mace Mod, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
