@@ -27,6 +27,7 @@ internal static class MaceWorldPoseTests
             {
                 TypeDefinition type=assembly.MainModule.GetType("MaceMod.Shared.MaceVisuals");
                 Check(type!=null,"Missing mace renderer");
+                Check(Calls(Method(type,"OpaqueMaterial"),"MaceMod.Shared.MaceShader","Select"),"Materials must use pipeline-compatible shader selection instead of Standard-first lookup");
                 MethodDefinition create=Method(type,"Create"),pose=Method(type,"Pose"),head=Method(type,"HeadPosition");
                 Check(pose.Parameters.Count==6,"World pose requires explicit player scale");
                 Check(head.Parameters.Count==3,"World head position requires explicit player scale");

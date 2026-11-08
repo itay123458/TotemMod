@@ -80,6 +80,11 @@ $taskWorldTests=Join-Path $taskTests 'MaceWorldPoseTests.exe'
 if($LASTEXITCODE -ne 0) { throw 'Mace world pose tests compilation failed.' }
 & $taskWorldTests $taskDll
 if($LASTEXITCODE -ne 0) { throw 'Mace world pose tests failed.' }
+$taskShaderTests=Join-Path $taskTests 'MaceShaderTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskShaderTests) (Join-Path $PSScriptRoot 'shared\MaceShader.cs') (Join-Path $PSScriptRoot 'tests\MaceShaderTests.cs')
+if($LASTEXITCODE -ne 0) { throw 'Mace shader tests compilation failed.' }
+& $taskShaderTests
+if($LASTEXITCODE -ne 0) { throw 'Mace shader compatibility tests failed.' }
 $taskMarkerTests=Join-Path $taskTests 'ModdedRoomMarkerTests.exe'
 & $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskMarkerTests) (Join-Path $PSScriptRoot 'shared\ModdedRoomMarker.cs') (Join-Path $PSScriptRoot 'tests\ModdedRoomMarkerTests.cs')
 if($LASTEXITCODE -ne 0) { throw 'Room marker tests compilation failed.' }

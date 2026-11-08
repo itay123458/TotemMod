@@ -4,7 +4,7 @@ Minecraft items and effects for Gorilla Tag, including totems and the mace.
 
 The existing DLL filenames, settings IDs and update URLs are retained so current installs keep working.
 
-Version **1.9.5** for PrimalCraft and its Mace receiver, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.9.6** for PrimalCraft and its Mace receiver, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 

@@ -140,6 +140,7 @@ namespace MaceMod.Shared
                 " boundsCenter="+bounds.center.ToString("F3")+" boundsSize="+bounds.size.ToString("F3")+
                 " renderer="+(renderer!=null?renderer.enabled.ToString():"none")+" visible="+(renderer!=null && renderer.isVisible)+
                 " shader="+(shader!=null?shader.name:"none")+" supported="+(shader!=null && shader.isSupported)+
+                " pipeline="+(GraphicsSettings.currentRenderPipeline!=null?GraphicsSettings.currentRenderPipeline.GetType().FullName:"Built-in")+
                 " layer="+item.layer+" taggerMask="+(taggerCamera!=null?taggerCamera.cullingMask.ToString("X8"):"none")+
                 " camera="+(camera!=null?camera.name:"none")+" cameraActive="+(camera!=null && camera.isActiveAndEnabled)+
                 " viewport="+viewport.ToString("F3");
@@ -205,8 +206,7 @@ namespace MaceMod.Shared
         }
         private static Material OpaqueMaterial(Texture2D texture,string name)
         {
-            Shader shader=Shader.Find("Standard")??Shader.Find("Universal Render Pipeline/Unlit")??Shader.Find("Unlit/Texture");
-            if(shader==null) throw new InvalidOperationException("An opaque mace shader is unavailable.");
+            Shader shader=MaceShader.Select();
             Material result=new Material(shader); result.name=name;
             result.mainTexture=texture;
             if(result.HasProperty("_BaseMap")) result.SetTexture("_BaseMap",texture);
