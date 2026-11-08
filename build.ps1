@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param([string]$GamePath = 'C:\Program Files (x86)\Steam\steamapps\common\Gorilla Tag',[switch]$UseTestUpdateKey)
 $ErrorActionPreference = 'Stop'
+$env:PYTHONDONTWRITEBYTECODE='1'
 $taskCsc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $taskManaged = Join-Path $GamePath 'Gorilla Tag_Data\Managed'
 $taskCore = Join-Path $GamePath 'BepInEx\core'
@@ -29,10 +30,6 @@ $taskSources += (Join-Path $PSScriptRoot 'updater\utilla\UtillaRepairBootstrap.c
 & (Join-Path $PSScriptRoot 'updater\bootstrap\build.ps1') -GamePath $GamePath
 if ($LASTEXITCODE -ne 0) { throw 'Shared companion updater build failed.' }
 $taskSources += (Join-Path $PSScriptRoot 'updater\bootstrap\CompanionBootstrap.cs')
-$taskMaceRoot=Join-Path $PSScriptRoot 'mace mod'
-& (Join-Path $taskMaceRoot 'build.ps1') -GamePath $GamePath
-if ($LASTEXITCODE -ne 0) { throw 'Mace companion build failed.' }
-$taskSources += (Join-Path $taskMaceRoot 'shared\ModdedRoomMarker.cs')
 $taskRepairResources = @(
     ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.dll') + ',TotemMod.UtillaFix.dll'),
     ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.sha256') + ',TotemMod.UtillaFix.sha256')
@@ -46,10 +43,17 @@ if (-not (Test-Path (Join-Path $PSScriptRoot 'assets\menu\click.pcm'))) {
     if ($LASTEXITCODE -ne 0) { throw 'Local Minecraft menu asset extraction failed.' }
 }
 $taskMenuResources = @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'assets\menu') -File | Where-Object { $_.Extension -in '.png','.pcm' } | ForEach-Object { '/resource:' + $_.FullName + ',TotemMod.Menu.' + $_.Name })
+if (-not (Test-Path (Join-Path $PSScriptRoot 'assets\survival\hotbar.png'))) {
+    & python (Join-Path $PSScriptRoot 'tools\extract-survival-assets.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Minecraft survival asset extraction failed.' }
+}
+& python (Join-Path $PSScriptRoot 'tests\test_survival_assets.py')
+if ($LASTEXITCODE -ne 0) { throw 'Minecraft survival asset integrity tests failed.' }
+$taskSurvivalResources=@(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'assets\survival') -File | Where-Object { $_.Extension -in '.png','.pcm' } | ForEach-Object { '/resource:'+ $_.FullName+',PrimalCraft.Survival.'+$_.Name })
 $taskDll = Join-Path $taskOutput 'TotemMod.dll'
 # Photon targets netstandard 2.0; this Unity installation supplies its compatible
 # netstandard 2.1 facade. Suppress only that legacy-csc identity warning.
-& $taskCsc /nologo /noconfig /nostdlib+ /target:library /optimize+ /warnaserror+ /nowarn:1701 /langversion:5 ("/out:" + $taskDll) @taskReferences ("/resource:" + (Join-Path $PSScriptRoot 'assets\totem.png') + ',TotemMod.totem.png') ("/resource:" + (Join-Path $PSScriptRoot 'assets\pop.pcm') + ',TotemMod.pop.pcm') ("/resource:" + (Join-Path $PSScriptRoot 'third_party\GorillaNotifications\gnotifications') + ',TotemMod.gnotifications') @taskMenuResources @taskRepairResources @taskSources
+& $taskCsc /nologo /noconfig /nostdlib+ /target:library /optimize+ /warnaserror+ /nowarn:1701 /langversion:5 ("/out:" + $taskDll) @taskReferences ("/resource:" + (Join-Path $PSScriptRoot 'assets\totem.png') + ',TotemMod.totem.png') ("/resource:" + (Join-Path $PSScriptRoot 'assets\pop.pcm') + ',TotemMod.pop.pcm') ("/resource:" + (Join-Path $PSScriptRoot 'third_party\GorillaNotifications\gnotifications') + ',TotemMod.gnotifications') @taskMenuResources @taskSurvivalResources @taskRepairResources @taskSources
 if ($LASTEXITCODE -ne 0) { throw 'Plugin compilation failed.' }
 $taskCecil = Join-Path $taskCore 'Mono.Cecil.dll'
 Copy-Item -LiteralPath $taskCecil -Destination $taskTests
@@ -144,6 +148,10 @@ $taskPixelTests=Join-Path $taskTests 'PixelMeshTests.exe'
 if ($LASTEXITCODE -ne 0) { throw 'Pixel mesh tests compilation failed.' }
 & $taskPixelTests (Join-Path $PSScriptRoot 'assets\totem.png')
 if ($LASTEXITCODE -ne 0) { throw 'Pixel mesh tests failed.' }
+foreach($taskFoodTexture in @('apple.png','bread.png','golden_apple.png')) {
+    & $taskPixelTests (Join-Path $PSScriptRoot ('assets\survival\'+$taskFoodTexture))
+    if ($LASTEXITCODE -ne 0) { throw 'Minecraft food geometry tests failed.' }
+}
 $taskBatchTests=Join-Path $taskTests 'PopParticleBatchTests.exe'
 & $taskCsc /nologo /target:exe /warnaserror+ ("/out:"+$taskBatchTests) ("/reference:"+$taskCecil) (Join-Path $PSScriptRoot 'tests\PopParticleBatchTests.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Particle batch tests compilation failed.' }
@@ -199,7 +207,7 @@ foreach ($taskUpdaterTestName in @('UpdateManifestTests','UpdateClientTests','Up
 $taskMaceInstallerTests=Join-Path $taskTests 'MaceUpdateInstallerTests.exe'
 & $taskCsc /nologo /target:exe /langversion:5 /warnaserror+ ("/out:"+$taskMaceInstallerTests) '/reference:System.Runtime.Serialization.dll' ("/reference:"+$taskCecil) @taskUpdaterTestCommon (Join-Path $PSScriptRoot 'tests\MaceUpdateInstallerTests.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Mace installer tests compilation failed.' }
-& $taskMaceInstallerTests (Join-Path $taskMaceRoot 'artifacts\MaceMod.dll') $taskDll $taskUpdaterKey (Join-Path $taskOutput 'TotemMod.CompanionUpdater.dll')
+& $taskMaceInstallerTests $taskDll $taskDll $taskUpdaterKey (Join-Path $taskOutput 'TotemMod.CompanionUpdater.dll')
 if ($LASTEXITCODE -ne 0) { throw 'Mace installer tests failed.' }
 } finally {
     if ($taskTemporaryTrust) {
@@ -212,8 +220,32 @@ $taskManifestTool=Join-Path $taskTests 'MakeUpdateManifest.exe'
 & $taskCsc /nologo /target:exe /langversion:5 /warnaserror+ ("/out:"+$taskManifestTool) '/reference:System.Runtime.Serialization.dll' ("/reference:"+$taskCecil) @taskUpdaterCommon (Join-Path $PSScriptRoot 'tools\MakeUpdateManifest.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Release signing tool compilation failed.' }
 Write-Output ("Verified updater helper: "+$taskUpdaterDll)
-$taskRemovalTests=Join-Path $taskTests 'MaceRemovalTests.exe'
-& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskRemovalTests) ('/reference:'+$taskCecil) (Join-Path $PSScriptRoot 'tests\MaceRemovalTests.cs')
-if ($LASTEXITCODE -ne 0) { throw 'Mace removal test compilation failed.' }
-& $taskRemovalTests $taskDll (Join-Path $taskMaceRoot 'artifacts\MaceMod.dll')
-if ($LASTEXITCODE -ne 0) { throw 'Mace removal checks failed.' }
+$taskRemovalTests=Join-Path $taskTests 'FeatureRemovalTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskRemovalTests) ('/reference:'+$taskCecil) (Join-Path $PSScriptRoot 'tests\FeatureRemovalTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Feature removal test compilation failed.' }
+& $taskRemovalTests $taskDll
+if ($LASTEXITCODE -ne 0) { throw 'Feature removal checks failed.' }
+$taskMarkerTests=Join-Path $taskTests 'ModdedRoomMarkerTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskMarkerTests) (Join-Path $PSScriptRoot 'src\ModdedRoomMarker.cs') (Join-Path $PSScriptRoot 'tests\ModdedRoomMarkerTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Room marker test compilation failed.' }
+& $taskMarkerTests
+if ($LASTEXITCODE -ne 0) { throw 'Room marker checks failed.' }
+$taskRetirementTool=Join-Path $taskTests 'FetchRetirementUpdate.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskRetirementTool) '/reference:System.Runtime.Serialization.dll' ('/reference:'+$taskCecil) @taskUpdaterCommon (Join-Path $PSScriptRoot 'updater\runtime\UpdateClient.cs') (Join-Path $PSScriptRoot 'tools\FetchRetirementUpdate.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Legacy update compatibility tool compilation failed.' }
+
+$taskSurvivalTests=Join-Path $taskTests 'SurvivalStateTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskSurvivalTests) (Join-Path $PSScriptRoot 'src\MinecraftInventory.cs') (Join-Path $PSScriptRoot 'src\SurvivalState.cs') (Join-Path $PSScriptRoot 'src\SurvivalFall.cs') (Join-Path $PSScriptRoot 'tests\SurvivalStateTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Survival model test compilation failed.' }
+& $taskSurvivalTests
+if ($LASTEXITCODE -ne 0) { throw 'Survival model tests failed.' }
+$taskSurvivalIntegration=Join-Path $taskTests 'SurvivalIntegrationTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskSurvivalIntegration) ('/reference:'+$taskCecil) (Join-Path $PSScriptRoot 'tests\SurvivalIntegrationTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Survival integration test compilation failed.' }
+& $taskSurvivalIntegration $taskDll
+if ($LASTEXITCODE -ne 0) { throw 'Survival integration checks failed.' }
+foreach($taskUtility in @('StageLocalRelease','LiveUpdateProbe')) {
+    $taskUtilitySource=Join-Path $PSScriptRoot $(if($taskUtility -eq 'StageLocalRelease') { 'tools\StageLocalRelease.cs' } else { 'tests\LiveUpdateProbe.cs' })
+    & $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+(Join-Path $taskTests ($taskUtility+'.exe'))) '/reference:System.Runtime.Serialization.dll' ('/reference:'+$taskCecil) @taskUpdaterCommon (Join-Path $PSScriptRoot 'updater\runtime\UpdateClient.cs') $taskUtilitySource
+    if ($LASTEXITCODE -ne 0) { throw 'Update deployment utility compilation failed.' }
+}

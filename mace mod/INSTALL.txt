@@ -1,4 +1,0 @@
-Mace has been removed in 1.9.8.
-Close Gorilla Tag and delete BepInEx\plugins\MaceMod.dll.
-Keep PrimalCraft and its updater helpers.
-Existing updaters can also replace the old mace with an inactive retirement DLL.

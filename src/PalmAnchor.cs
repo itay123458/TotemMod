@@ -6,6 +6,9 @@ namespace TotemMod
     {
         private Transform cachedRoot;
         private Transform cachedPalm;
+        private readonly string palmName;
+
+        public PalmAnchor(bool left=true) { palmName=left ? "palm.01.L" : "palm.01.R"; }
 
         public Transform Resolve(Transform rigRoot, Transform fallback)
         {
@@ -17,9 +20,9 @@ namespace TotemMod
             return cachedPalm != null ? cachedPalm : fallback;
         }
 
-        private static Transform FindPalm(Transform node)
+        private Transform FindPalm(Transform node)
         {
-            if (node.name == "palm.01.L") return node;
+            if (node.name == palmName) return node;
             foreach (Transform child in node)
             {
                 Transform palm = FindPalm(child);

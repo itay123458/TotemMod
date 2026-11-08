@@ -21,19 +21,19 @@ internal static class StageLocalRelease
     {
         try
         {
-            if(args.Length!=4) throw new ArgumentException("Usage: StageLocalRelease BepInExRoot GameAssembly ReleaseArtifacts MaceCandidateDll");
+            if(args.Length<3 || args.Length>4) throw new ArgumentException("Usage: StageLocalRelease BepInExRoot GameAssembly ReleaseArtifacts [LegacyMaceCandidateDll]");
             string root=Path.GetFullPath(args[0]),gameHash=Hash(args[1]);
             string totem=Path.Combine(root,"plugins","TotemMod.dll"),mace=Path.Combine(root,"plugins","MaceMod.dll");
             string totemBefore=Hash(totem),maceBefore=File.Exists(mace)?Hash(mace):null;
             UpdateManifest totemManifest=UpdateManifest.Read(File.ReadAllBytes(Path.Combine(args[2],"totem-update.json")));
-            UpdateManifest maceManifest=UpdateManifest.Read(File.ReadAllBytes(Path.Combine(args[2],"mace-update.json")),UpdateProduct.Mace);
-            if(!totemManifest.SupportedGame(gameHash) || !maceManifest.SupportedGame(gameHash)) throw new InvalidDataException("Release does not match this game build.");
+            UpdateManifest maceManifest=args.Length==4 ? UpdateManifest.Read(File.ReadAllBytes(Path.Combine(args[2],"mace-update.json")),UpdateProduct.Mace) : null;
+            if(!totemManifest.SupportedGame(gameHash) || maceManifest!=null && !maceManifest.SupportedGame(gameHash)) throw new InvalidDataException("Release does not match this game build.");
             if(totemManifest.IsNewerThan(VersionOf(totem,UpdateTrust.PluginGuid)))
             {
                 UpdateInstaller.Stage(root,new UpdateDownload(totemManifest,File.ReadAllBytes(Path.Combine(args[2],"TotemMod.dll"))));
                 Console.WriteLine("Totem "+UpdateInstaller.PendingVersion(root)+" queued for next launch.");
             }
-            if(maceBefore!=null && maceManifest.IsNewerThan(VersionOf(mace,UpdateTrust.MaceGuid)))
+            if(maceBefore!=null && maceManifest!=null && maceManifest.IsNewerThan(VersionOf(mace,UpdateTrust.MaceGuid)))
             {
                 MaceUpdateInstaller.Stage(root,new UpdateDownload(maceManifest,File.ReadAllBytes(args[3])));
                 Console.WriteLine("Mace "+MaceUpdateInstaller.PendingVersion(root)+" queued for next launch.");

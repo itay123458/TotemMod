@@ -1,12 +1,24 @@
 # PrimalCraft
 
-Minecraft totems, effects and VR settings for Gorilla Tag.
+PrimalCraft is a Minecraft-themed mod for Gorilla Tag. Current features include a functional Minecraft inventory, health, hunger, food, totems, VR settings and approved Beta customization.
 
 The existing DLL filenames, settings IDs and update URLs are retained so current installs keep working.
 
-Version **1.9.8** for PrimalCraft, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **2.0.0** for PrimalCraft, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
+
+## Minecraft inventory and survival
+
+In private modded rooms, the lower VR HUD shows **10 hearts, 10 hunger icons and a 9-slot hotbar**, plus the separate left-offhand totem supply. **B** or keyboard **E** opens 27 storage slots above the nine hotbar slots. Point and pull the right trigger to pick up/place, merge or swap stacks. Closing the inventory safely returns a carried stack. Arrow keys and Enter also work.
+
+**A** cycles the hotbar; keyboard **1?9** selects a slot directly. Selected food appears in your right hand. **Hold the right trigger for 1.6 seconds** to eat (keyboard/mouse: hold right mouse). Apple and bread require missing hunger; golden apples can be eaten at full hunger. Each completed use consumes one item. New rooms start with 8 apples, 8 bread and 2 golden apples; storage slots start empty.
+
+Health and hunger each have 20 points. Movement and time spend hunger through a saturation buffer. Apples restore 4 hunger, bread restores 5, and golden apples restore 4, heal 4 health and provide temporary regeneration. High hunger naturally heals missing health; empty hunger slowly damages you down to half a heart. These are adaptations for Gorilla Tag, not a complete Minecraft ruleset.
+
+Falls beyond three player-scaled meters cause landing damage. Confirmed native tags deal two hearts; round-start infection assignment does not. Gorilla Tag infection rules still run normally. Fatal Minecraft damage can spend an equipped offhand totem to restore half a heart with temporary immunity/regeneration. An ordinary native-tag totem save preserves surviving health. Without a save, health death returns your local player to the room-entry position after three seconds and restores health/hunger; it does not clear native infection. Food inventory is preserved on health respawn.
+
+**Y** keeps equipping/unequipping the left-hand totem, with the existing 5-charge/40-second regeneration rules. The offhand icon reads that same supply and cannot create duplicate totems. **Hold X / F7** opens settings. Inventory and settings close each other, and eating pauses while either is open. The Minecraft category controls survival, HUD visibility/size, and fall/tag damage. New survival mechanics run only in private modded rooms.
 
 ## Install and controls
 
@@ -30,6 +42,7 @@ The developer has six top-level categories and 26 named pages. Approved Beta acc
 
 | Category | Pages and controls |
 |---|---|
+| Minecraft | Inventory, functional survival, HUD size and damage settings. |
 | Game | Presets, Rules, Round: five presets, stock/recharge/cap sliders, protection, auto-start, timer controls, refills and time-cap shortcuts. |
 | Totem | Size and Grip, Palm Position, Palm Rotation: global/held scales, grip presets, saved custom grip, position/rotation sliders and 90-degree steps. |
 | Effects | Particles, Sound and Motion, Friends and Quality, Effect Presets: amount/size/spread/colors/shape/brightness/spin; sound volume/pitch; animation style/speed/distance/height; friend range/render scale/sounds; haptics; six local effect presets and preview. |
@@ -55,9 +68,9 @@ Other experiments include recoloring the classic totem, crystal/block/star shape
 
 ## Mace removed
 
-The mace, enchantments, Wind Burst, fling mechanics and mace menu pages have been removed in 1.9.8. Existing MaceMod.dll installs receive an inactive retirement update through the signed updater. PrimalCraft also disables an older mace companion if only the main plugin has updated. No mace code or assets are embedded in the main plugin.
+The mace, enchantments, Wind Burst, fling mechanics and mace menu pages have been removed in 1.9.8. Existing MaceMod.dll installs can receive the previously published inactive retirement update. No mace gameplay code or assets are kept in this workspace or embedded in the main plugin.
 
-You can delete `BepInEx/plugins/MaceMod.dll` while Gorilla Tag is closed. Keep the shared updater helpers, which are still used by PrimalCraft. The old source is retained locally for reference and is not compiled into this release.
+You can delete `BepInEx/plugins/MaceMod.dll` while Gorilla Tag is closed. Keep the shared updater helpers, which are still used by PrimalCraft. The old weapon source, textures, sounds and tests have been removed. Generated historical builds have been moved outside this workspace.
 
 ## Totem protection
 

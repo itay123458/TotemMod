@@ -80,6 +80,7 @@ namespace TotemMod
         private MenuCategory[] MenuPages()
         {
             MenuCategory[] categories={
+                MinecraftCategory(),
                 new MenuCategory("Game",new[] {
                     new MenuPage("Presets",new[] {
                         PresetButton(0),PresetButton(1),PresetButton(2),PresetButton(3),PresetButton(4),
@@ -265,10 +266,20 @@ namespace TotemMod
                     })
                 })
             };
-            System.Collections.Generic.List<MenuCategory> visible=new System.Collections.Generic.List<MenuCategory>(categories);
-            if (!IsDeveloper) visible.RemoveAt(visible.Count-1);
-            if (!IsDeveloper && !HasBetaAccess) visible.RemoveAt(4);
+            System.Collections.Generic.List<MenuCategory> visible=new System.Collections.Generic.List<MenuCategory>();
+            foreach(MenuCategory category in categories)
+            {
+                if(!CategoryVisible(category)) continue;
+                visible.Add(category);
+            }
             return visible.ToArray();
+        }
+
+        private bool CategoryVisible(MenuCategory category)
+        {
+            if(category.Title=="Dev") return IsDeveloper;
+            if(category.Title=="Beta") return IsDeveloper || HasBetaAccess;
+            return true;
         }
     }
 }

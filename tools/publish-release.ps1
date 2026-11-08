@@ -13,19 +13,13 @@ $releaseDll=Join-Path $releaseArtifacts 'TotemMod.dll'
 $releaseHelper=Join-Path $releaseArtifacts 'TotemMod.Updater.dll'
 $releaseUtillaFix=Join-Path $releaseArtifacts 'TotemMod.UtillaFix.dll'
 $releaseCompanionHelper=Join-Path $releaseArtifacts 'TotemMod.CompanionUpdater.dll'
-$releaseMace=Join-Path $releaseRoot 'mace mod\artifacts\MaceMod.dll'
 $releaseKey=Join-Path $env:USERPROFILE '.totemmod\update-signing-private.xml'
 if (-not (Test-Path -LiteralPath $releaseKey)) { throw 'Publisher signing key is missing. It is not stored in the repository.' }
 $releaseManifest=Join-Path $releaseArtifacts 'totem-update.json'
 & (Join-Path $releaseArtifacts 'tests\MakeUpdateManifest.exe') $releaseDll (Join-Path $GamePath 'Gorilla Tag_Data\Managed\Assembly-CSharp.dll') $releaseKey $releaseManifest
 if ($LASTEXITCODE -ne 0) { throw 'Release signing failed.' }
-$releaseMaceManifest=Join-Path $releaseArtifacts 'mace-update.json'
-& (Join-Path $releaseArtifacts 'tests\MakeUpdateManifest.exe') $releaseMace (Join-Path $GamePath 'Gorilla Tag_Data\Managed\Assembly-CSharp.dll') $releaseKey $releaseMaceManifest mace
-if ($LASTEXITCODE -ne 0) { throw 'Mace release signing failed.' }
 $releaseMetadata=Get-Content -LiteralPath $releaseManifest -Raw | ConvertFrom-Json
 $releaseVersion=$releaseMetadata.Version
-$releaseMaceMetadata=Get-Content -LiteralPath $releaseMaceManifest -Raw | ConvertFrom-Json
-if ($releaseMaceMetadata.Version -ne $releaseVersion) { throw 'Totem and Mace must declare the same release version.' }
 $releaseTag='v'+$releaseVersion
 $releaseWork=Join-Path $releaseArtifacts ('publish-'+$releaseVersion)
 if (Test-Path -LiteralPath $releaseWork) { throw ('Release staging already exists: '+$releaseWork+'. Use a new version or review the existing staged release.') }
@@ -38,22 +32,14 @@ $null=[IO.Directory]::CreateDirectory((Join-Path $releasePackage 'BepInEx\patche
 # Copy an explicit source allowlist. Recovered files, installed game DLLs,
 # local backups, asset caches, compiled tests and private keys never enter git.
 foreach ($releaseDirectory in @('src','tests','updater','tools','third_party')) {
-    Copy-Item -LiteralPath (Join-Path $releaseRoot $releaseDirectory) -Destination (Join-Path $releaseRepo $releaseDirectory) -Recurse
-}
-$releaseMaceSource=Join-Path $releaseRepo 'mace mod'
-$null=[IO.Directory]::CreateDirectory($releaseMaceSource)
-foreach ($releaseDirectory in @('shared','src','tools','tests')) {
-    $releaseSourceDirectory=Join-Path $releaseRoot ('mace mod\'+$releaseDirectory)
-    $releaseDestinationDirectory=Join-Path $releaseMaceSource $releaseDirectory
-    foreach ($releaseSourceFile in (Get-ChildItem -LiteralPath $releaseSourceDirectory -Recurse -File | Where-Object { $_.Extension -in '.cs','.py','.ps1','.md','.txt' })) {
-        $releaseRelative=$releaseSourceFile.FullName.Substring($releaseSourceDirectory.Length+1)
-        $releaseDestination=Join-Path $releaseDestinationDirectory $releaseRelative
+    $releaseSourceRoot=Join-Path $releaseRoot $releaseDirectory
+    foreach($releaseSourceFile in (Get-ChildItem -LiteralPath $releaseSourceRoot -Recurse -File)) {
+        if($releaseSourceFile.FullName -match '[\\/]__pycache__[\\/]' -or $releaseSourceFile.Extension -in '.pyc','.pyo') { continue }
+        $releaseRelative=$releaseSourceFile.FullName.Substring($releaseSourceRoot.Length+1)
+        $releaseDestination=Join-Path (Join-Path $releaseRepo $releaseDirectory) $releaseRelative
         $null=[IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($releaseDestination))
         Copy-Item -LiteralPath $releaseSourceFile.FullName -Destination $releaseDestination
     }
-}
-foreach ($releaseFile in @('build.ps1','README.md','INSTALL.txt')) {
-    Copy-Item -LiteralPath (Join-Path $releaseRoot ('mace mod\'+$releaseFile)) -Destination (Join-Path $releaseMaceSource $releaseFile)
 }
 $null=[IO.Directory]::CreateDirectory((Join-Path $releaseRepo 'compat\utilla'))
 Get-ChildItem -LiteralPath (Join-Path $releaseRoot 'compat\utilla') -File | Where-Object { $_.Extension -in '.cs','.ps1' } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $releaseRepo 'compat\utilla') }
@@ -73,16 +59,13 @@ foreach ($releaseTextFile in (Get-ChildItem -LiteralPath $releaseRepo -Recurse -
 }
 $releaseZip=Join-Path $releaseArtifacts ('PrimalCraft-'+$releaseVersion+'.zip')
 Compress-Archive -Path (Join-Path $releasePackage '*') -DestinationPath $releaseZip -Force
-$releaseMacePackage=Join-Path $releaseWork 'mace-package'
-$null=[IO.Directory]::CreateDirectory((Join-Path $releaseMacePackage 'BepInEx\plugins'))
-$null=[IO.Directory]::CreateDirectory((Join-Path $releaseMacePackage 'BepInEx\patchers'))
-Copy-Item -LiteralPath $releaseMace -Destination (Join-Path $releaseMacePackage 'BepInEx\plugins\MaceMod.dll')
-Copy-Item -LiteralPath $releaseUtillaFix -Destination (Join-Path $releaseMacePackage 'BepInEx\patchers\TotemMod.UtillaFix.dll')
-Copy-Item -LiteralPath $releaseCompanionHelper -Destination (Join-Path $releaseMacePackage 'BepInEx\patchers\TotemMod.CompanionUpdater.dll')
-Copy-Item -LiteralPath (Join-Path $releaseMaceSource 'README.md') -Destination (Join-Path $releaseMacePackage 'README.md')
-Copy-Item -LiteralPath (Join-Path $releaseRepo 'LICENSE') -Destination (Join-Path $releaseMacePackage 'LICENSE')
-$releaseMaceZip=Join-Path $releaseArtifacts ('MaceRemoval-'+$releaseVersion+'.zip')
-Compress-Archive -Path (Join-Path $releaseMacePackage '*') -DestinationPath $releaseMaceZip -Force
+# Keep the already-published inactive retirement endpoint working for old
+# clients. No retired source or Minecraft mace assets are built or packaged.
+$releaseLegacy=Join-Path $releaseWork 'legacy-update-compatibility'
+& (Join-Path $releaseArtifacts 'tests\FetchRetirementUpdate.exe') (Join-Path $GamePath 'Gorilla Tag_Data\Managed\Assembly-CSharp.dll') $releaseLegacy
+if ($LASTEXITCODE -ne 0) { throw 'The signed legacy retirement update could not be verified.' }
+$releaseMace=Join-Path $releaseLegacy 'MaceMod.dll'
+$releaseMaceManifest=Join-Path $releaseLegacy 'mace-update.json'
 $releaseNotes=Join-Path $releaseWork 'release-notes.md'
 if ($NotesFile) { Copy-Item -LiteralPath $NotesFile -Destination $releaseNotes }
 else { @"
@@ -119,12 +102,12 @@ $releaseAccountId=& gh api user --jq .id
 if ($LASTEXITCODE -ne 0) { throw 'GitHub account lookup failed.' }
 & git -C $releaseRepo config user.name itay123458
 & git -C $releaseRepo config user.email ($releaseAccountId+'+itay123458@users.noreply.github.com')
-& git -C $releaseRepo add -A -- src tests updater tools third_party compat 'mace mod' build.ps1 README.md LICENSE .gitignore
+& git -C $releaseRepo add -A -- .
 & git -C $releaseRepo commit --quiet -m ('Release PrimalCraft '+$releaseVersion)
 if ($LASTEXITCODE -ne 0) { throw 'Git commit failed.' }
 if ($releaseRepositoryExists) { & git -C $releaseRepo push origin main }
 else { & gh repo create itay123458/TotemMod --public --description 'PrimalCraft: Minecraft items, VR settings and signed updates for Gorilla Tag.' --source $releaseRepo --remote origin --push }
 if ($LASTEXITCODE -ne 0) { throw 'Repository creation or push failed. No release was published.' }
-& gh release create $releaseTag $releaseDll $releaseHelper $releaseUtillaFix $releaseCompanionHelper $releaseMace $releaseManifest $releaseMaceManifest $releaseZip $releaseMaceZip --repo itay123458/TotemMod --title ('PrimalCraft '+$releaseVersion) --notes-file $releaseNotes --latest
+& gh release create $releaseTag $releaseDll $releaseHelper $releaseUtillaFix $releaseCompanionHelper $releaseMace $releaseManifest $releaseMaceManifest $releaseZip --repo itay123458/TotemMod --title ('PrimalCraft '+$releaseVersion) --notes-file $releaseNotes --latest
 if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
 Write-Output ('Published https://github.com/itay123458/TotemMod/releases/tag/'+$releaseTag)

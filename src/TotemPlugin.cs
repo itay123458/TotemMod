@@ -73,8 +73,8 @@ namespace TotemMod
             {
                 var room=PhotonNetwork.CurrentRoom;
                 if(RoomAccess.Allows(PhotonNetwork.InRoom,room!=null,inModdedRoom && moddedRoom==room)) return true;
-                return room!=null && room.CustomProperties!=null && room.CustomProperties.ContainsKey(MaceMod.Shared.ModdedRoomMarker.Property) && room.CustomProperties.ContainsKey("gameMode") &&
-                    MaceMod.Shared.ModdedRoomMarker.Allows(PhotonNetwork.InRoom,room.IsVisible,room.CustomProperties[MaceMod.Shared.ModdedRoomMarker.Property],room.CustomProperties["gameMode"]);
+                return room!=null && room.CustomProperties!=null && room.CustomProperties.ContainsKey(ModdedRoomMarker.Property) && room.CustomProperties.ContainsKey("gameMode") &&
+                    ModdedRoomMarker.Allows(PhotonNetwork.InRoom,room.IsVisible,room.CustomProperties[ModdedRoomMarker.Property],room.CustomProperties["gameMode"]);
             }
         }
         private bool Allowed { get { return RoomAllowed && (modEnabled == null || modEnabled.Value); } }
@@ -83,7 +83,6 @@ namespace TotemMod
         {
             Instance = this;
             Log = Logger;
-            RetireLegacyMace();
             handPosition = Config.Bind("Hand", "PalmOffset", new Vector3(0f, 0.005f, 0f), "Totem center relative to palm.01.L, in meters. Replaces the older wrist GripPosition setting.");
             handRotation = Config.Bind("Hand", "PalmRotation", new Vector3(-90f, -90f, 0f), "Totem orientation relative to palm.01.L. Replaces the older GripRotation setting.");
             heldScale = Config.Bind("Hand", "HeldScale", 0.75f, "Held size multiplier; pop animation keeps the full configured TotemSize.");
@@ -93,6 +92,7 @@ namespace TotemMod
             volume = Config.Bind("General", "PopVolume", 0.9f, "Minecraft totem pop volume, 0 to 1.");
             fx = Config.Bind("General", "EnablePopFx", true, "Play the Minecraft pop sound, animation and gold/green particles.");
             InitializeSettings();
+            InitializeSurvival();
             InitializeAutoUpdater();
             sync = new PhotonSync(() => isActiveAndEnabled && Allowed, ReceiveFriend, RemoveFriend, ClearFriends, ReceiveRescue,ReceiveRules,ReceiveRefillRequest,ReceiveRefillResult,
                 actor => true,ReceiveDeveloperCommand,DeveloperCommandResult,SignDeveloperCommand,VerifyDeveloperCommand);
@@ -165,12 +165,12 @@ namespace TotemMod
 
         private void Update()
         {
-            RetireLegacyMace();
             TickAutoUpdater();
             TickMenuControls();
             bool allowed = Allowed;
             bool down = YDown() || KeyHeld(KeyCode.Y);
             int regenerated = inventory.Advance(Time.unscaledTime);
+            TickSurvival();
             if (!allowed)
             {
                 queuedCommands.Clear();
@@ -190,7 +190,7 @@ namespace TotemMod
             wasTagged = tagged;
             if (regenerated > 0 && notifyRegen.Value) ShowNotice("Totem regenerated  |  " + StockText() + "\nPress Y to equip", false);
             bool equippedBefore = state.Equipped;
-            bool emptyPress = state.Update(true, down, inventory.Count > 0);
+            bool emptyPress = state.Update(CanEquipSurvivalTotem(), down, inventory.Count > 0);
             if (emptyPress) ShowNotice("Out of totems", true);
             else if (notifyEquip.Value && !equippedBefore && state.Equipped) ShowNotice("Totem equipped  |  " + StockText(), false);
             else if (notifyEquip.Value && equippedBefore && !state.Equipped) ShowNotice("Totem unequipped  |  " + StockText(), false);
@@ -202,6 +202,7 @@ namespace TotemMod
 
         private void LateUpdate()
         {
+            RenderSurvival();
             if (!Allowed) return;
             MaintainBetaSource();
             BetaAppearance current=HasBetaAccess && LocalBetaState().Enabled ? LocalBetaState() : null;
@@ -275,6 +276,7 @@ namespace TotemMod
                 return;
             }
             state.Consume();
+            if(SurvivalAllowed && survivalEnabled.Value) survival.TotemSave(Time.unscaledTime);
             HideHeld();
             sync.Pop(SafeSize(), Time.unscaledTime);
             if (notifyPop.Value || inventory.Count==0) ShowNotice(inventory.Count == 0 ? "Out of totems" : "Totem popped  |  " + StockText() + " left\nPress Y for another", inventory.Count == 0);
@@ -445,10 +447,11 @@ namespace TotemMod
             if (sync != null) sync.Reset();
         }
 
-        private void OnDisable() { updateCancelled=true; ResetBetaNetwork(); queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
+        private void OnDisable() { HideSurvival(); updateCancelled=true; ResetBetaNetwork(); queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
 
         private void OnDestroy()
         {
+            DisposeSurvival();
             StopAutoUpdater();
             OnDisable();
             TagObserver.Uninstall();

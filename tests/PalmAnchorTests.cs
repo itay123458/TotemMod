@@ -31,6 +31,7 @@ internal static class PalmAnchorTests
         skeleton.Children.Add(left);
         Check(anchor.Resolve(rig,wrist) == left, "A late-created left palm replaces the wrist fallback.");
         Check(anchor.Resolve(rig,wrist) != right, "Right palm is never used for a left-hand totem.");
+        Check(new PalmAnchor(false).Resolve(rig,wrist)==right,"Right-hand items resolve the right palm without changing the offhand.");
         Check(anchor.Resolve(rig,wrist) == left, "Stable rig keeps the same palm attachment.");
         UnityEngine.Transform nextRig = new UnityEngine.Transform("NewRig");
         UnityEngine.Transform nextPalm = new UnityEngine.Transform("palm.01.L"); nextRig.Children.Add(nextPalm);
