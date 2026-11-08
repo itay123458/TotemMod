@@ -9,14 +9,51 @@ namespace TotemMod.Updating
     // Nothing in this class loads the candidate assembly into the CLR.
     internal static class UpdateInstaller
     {
-        private const string DllName = "TotemMod.dll";
-        private const string ManifestName = "totem-update.json";
+        private static readonly UpdateInstallerCore Core = new UpdateInstallerCore(UpdateProduct.Totem);
+        internal static void Stage(string bepinRoot, UpdateDownload download) { Core.Stage(bepinRoot, download); }
+        internal static string PendingVersion(string bepinRoot) { return Core.PendingVersion(bepinRoot); }
+        internal static UpdateManifest PendingManifest(string bepinRoot) { return Core.PendingManifest(bepinRoot); }
+        internal static bool CancelPending(string bepinRoot) { return Core.CancelPending(bepinRoot); }
+        internal static string ApplyPending(string bepinRoot, string pluginPath, string gameAssemblyPath) { return Core.ApplyPending(bepinRoot, pluginPath, gameAssemblyPath); }
+    }
+
+    internal static class MaceUpdateInstaller
+    {
+        private static readonly UpdateInstallerCore Core = new UpdateInstallerCore(UpdateProduct.Mace);
+        internal static void Stage(string bepinRoot, UpdateDownload download) { Core.Stage(bepinRoot, download); }
+        internal static string PendingVersion(string bepinRoot) { return Core.PendingVersion(bepinRoot); }
+        internal static UpdateManifest PendingManifest(string bepinRoot) { return Core.PendingManifest(bepinRoot); }
+        internal static bool CancelPending(string bepinRoot) { return Core.CancelPending(bepinRoot); }
+        internal static string ApplyPending(string bepinRoot, string pluginPath, string gameAssemblyPath) { return Core.ApplyPending(bepinRoot, pluginPath, gameAssemblyPath); }
+        internal static Version InstalledVersion(string fullPath) { return Core.InstalledVersion(fullPath); }
+    }
+
+    // Product identity is fixed at construction. The two public surfaces share
+    // safety rules without sharing cache locks, pending state, or mutable options.
+    internal sealed class UpdateInstallerCore
+    {
+        private readonly UpdateProduct product;
+        private readonly string DllName, ManifestName, CacheName, PluginGuid, DisplayName, Stem;
         private const string ReadyName = "ready";
 
-        internal static void Stage(string bepinRoot, UpdateDownload download)
+        internal UpdateInstallerCore(UpdateProduct product)
+        {
+            this.product = product;
+            DllName = UpdateTrust.AssetNameFor(product);
+            PluginGuid = UpdateTrust.ProductGuidFor(product);
+            bool mace = product == UpdateProduct.Mace;
+            ManifestName = mace ? "mace-update.json" : "totem-update.json";
+            CacheName = mace ? "MaceModUpdater" : "TotemModUpdater";
+            DisplayName = mace ? "Mace Mod" : "Totem Mod";
+            Stem = Path.GetFileNameWithoutExtension(DllName);
+        }
+
+        internal void Stage(string bepinRoot, UpdateDownload download)
         {
             if (download == null) throw new ArgumentNullException("download");
-            download = new UpdateDownload(UpdateManifest.Read(download.Manifest.ToJson()), (byte[])download.Payload.Clone());
+            if (download.Manifest == null || download.Manifest.Product != product)
+                throw new InvalidDataException("The download belongs to a different updater product.");
+            download = new UpdateDownload(UpdateManifest.Read(download.Manifest.ToJson(), product), (byte[])download.Payload.Clone());
             UpdateManifest.VerifyPayload(download.Manifest, download.Payload);
             RequireSupportedUpdater(download.Manifest);
             RequireVersion(download.Payload, download.Manifest.ParsedVersion);
@@ -57,13 +94,13 @@ namespace TotemMod.Updating
             }
         }
 
-        internal static string PendingVersion(string bepinRoot)
+        internal string PendingVersion(string bepinRoot)
         {
             UpdateManifest manifest=PendingManifest(bepinRoot);
             return manifest==null ? null : manifest.Version;
         }
 
-        internal static UpdateManifest PendingManifest(string bepinRoot)
+        internal UpdateManifest PendingManifest(string bepinRoot)
         {
             string cache = Cache(bepinRoot, false);
             if (!Directory.Exists(cache)) return null;
@@ -75,7 +112,7 @@ namespace TotemMod.Updating
             }
         }
 
-        internal static bool CancelPending(string bepinRoot)
+        internal bool CancelPending(string bepinRoot)
         {
             string cache = Cache(bepinRoot, false);
             if (!Directory.Exists(cache)) return false;
@@ -90,7 +127,7 @@ namespace TotemMod.Updating
 
         // Only the preloader calls this, before Chainloader discovers any plugins.
         // Errors propagate to its logging boundary; the existing plugin stays in place.
-        internal static string ApplyPending(string bepinRoot, string pluginPath, string gameAssemblyPath)
+        internal string ApplyPending(string bepinRoot, string pluginPath, string gameAssemblyPath)
         {
             string cache = Cache(bepinRoot, false);
             if (!Directory.Exists(cache)) return null;
@@ -103,23 +140,23 @@ namespace TotemMod.Updating
                 EnsureSafePath(pluginDirectory);
                 string target = Child(pluginDirectory, DllName);
                 if (!String.Equals(Path.GetFullPath(pluginPath), target, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("The update target must be BepInEx/plugins/TotemMod.dll.");
+                    throw new InvalidDataException("The update target must be BepInEx/plugins/" + DllName + ".");
                 EnsureSafePath(target);
                 EnsureSafePath(gameAssemblyPath);
-                if (!File.Exists(target)) throw new InvalidDataException("The installed Totem Mod is missing.");
+                if (!File.Exists(target)) throw new InvalidDataException("The installed " + DisplayName + " is missing.");
                 if (!File.Exists(gameAssemblyPath)) throw new InvalidDataException("The game assembly is missing.");
                 if (!String.Equals(HashFile(gameAssemblyPath), download.Manifest.GameSha256, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("This update does not support the installed game build.");
                 string backups = Child(cache, "backups");
                 EnsureDirectory(backups);
-                string temporary = Child(pluginDirectory, "TotemMod.update-" + Guid.NewGuid().ToString("N") + ".tmp");
+                string temporary = Child(pluginDirectory, Stem + ".update-" + Guid.NewGuid().ToString("N") + ".tmp");
                 // Deny writes to the inspected target until the atomic replacement completes.
                 using (FileStream installed = new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
                 {
                     Version installedVersion = ReadPluginVersion(ReadBounded(installed, UpdateTrust.MaximumDllBytes));
                     if (!download.Manifest.IsNewerThan(installedVersion))
-                        throw new InvalidDataException("The pending update is not newer than the installed Totem Mod.");
-                    string backup = Child(backups, "TotemMod-" + installedVersion.ToString(3) + "-" + Guid.NewGuid().ToString("N") + ".bak");
+                        throw new InvalidDataException("The pending update is not newer than the installed " + DisplayName + ".");
+                    string backup = Child(backups, Stem + "-" + installedVersion.ToString(3) + "-" + Guid.NewGuid().ToString("N") + ".bak");
                     try
                     {
                         WriteNew(temporary, download.Payload);
@@ -136,16 +173,16 @@ namespace TotemMod.Updating
                 try { RemovePending(pending); }
                 catch (Exception error)
                 {
-                    return "Installed Totem Mod " + download.Manifest.Version + "; pending cleanup failed: " + error.Message;
+                    return "Installed " + DisplayName + " " + download.Manifest.Version + "; pending cleanup failed: " + error.Message;
                 }
-                return "Installed Totem Mod " + download.Manifest.Version + ". Previous version saved in " + backups;
+                return "Installed " + DisplayName + " " + download.Manifest.Version + ". Previous version saved in " + backups;
             }
         }
 
-        private static UpdateDownload ReadPending(string pending)
+        private UpdateDownload ReadPending(string pending)
         {
             CheckPending(pending, true);
-            UpdateManifest manifest = UpdateManifest.Read(ReadBoundedFile(Child(pending, ManifestName), UpdateTrust.MaximumManifestBytes));
+            UpdateManifest manifest = UpdateManifest.Read(ReadBoundedFile(Child(pending, ManifestName), UpdateTrust.MaximumManifestBytes), product);
             byte[] payload = ReadBoundedFile(Child(pending, DllName), UpdateTrust.MaximumDllBytes);
             UpdateManifest.VerifyPayload(manifest, payload);
             RequireSupportedUpdater(manifest);
@@ -153,7 +190,7 @@ namespace TotemMod.Updating
             return new UpdateDownload(manifest, payload);
         }
 
-        private static void RequireVersion(byte[] payload, Version expected)
+        private void RequireVersion(byte[] payload, Version expected)
         {
             if (ReadPluginVersion(payload) != expected)
                 throw new InvalidDataException("The DLL plugin version does not match the signed update manifest.");
@@ -165,7 +202,14 @@ namespace TotemMod.Updating
                 throw new InvalidDataException("The update requires a newer Totem Mod updater helper.");
         }
 
-        private static Version ReadPluginVersion(byte[] payload)
+        internal Version InstalledVersion(string fullPath)
+        {
+            if (String.IsNullOrEmpty(fullPath) || !Path.IsPathRooted(fullPath))
+                throw new InvalidDataException("An installed plugin baseline requires an absolute path.");
+            return ReadPluginVersion(ReadBoundedFile(Path.GetFullPath(fullPath), UpdateTrust.MaximumDllBytes));
+        }
+
+        private Version ReadPluginVersion(byte[] payload)
         {
             using (MemoryStream stream = new MemoryStream(payload, false))
             using (AssemblyDefinition assembly = AssemblyDefinition.ReadAssembly(stream))
@@ -177,8 +221,8 @@ namespace TotemMod.Updating
                     {
                         if (attribute.AttributeType.FullName != "BepInEx.BepInPlugin") continue;
                         if (attribute.ConstructorArguments.Count != 3 ||
-                            (string)attribute.ConstructorArguments[0].Value != UpdateTrust.PluginGuid || found != null)
-                            throw new InvalidDataException("The DLL does not identify only the expected Totem Mod plugin.");
+                            (string)attribute.ConstructorArguments[0].Value != PluginGuid || found != null)
+                            throw new InvalidDataException("The DLL does not identify only the expected " + DisplayName + " plugin.");
                         string version = attribute.ConstructorArguments[2].Value as string;
                         Version parsed;
                         if (!Version.TryParse(version, out parsed) || parsed.Build < 0 || parsed.Revision >= 0 || parsed.ToString(3) != version)
@@ -186,17 +230,17 @@ namespace TotemMod.Updating
                         found = parsed;
                     }
                 }
-                if (found == null) throw new InvalidDataException("The DLL is not the expected Totem Mod plugin.");
+                if (found == null) throw new InvalidDataException("The DLL is not the expected " + DisplayName + " plugin.");
                 return found;
             }
         }
 
-        private static string Cache(string bepinRoot, bool create)
+        private string Cache(string bepinRoot, bool create)
         {
             string root = Path.GetFullPath(bepinRoot);
             EnsureSafePath(root);
             string cacheDirectory = Child(root, "cache");
-            string cache = Child(cacheDirectory, "TotemModUpdater");
+            string cache = Child(cacheDirectory, CacheName);
             if (create) { EnsureDirectory(cacheDirectory); EnsureDirectory(cache); }
             else { EnsureSafePath(cacheDirectory); EnsureSafePath(cache); RejectFile(cache); }
             return cache;
@@ -250,7 +294,7 @@ namespace TotemMod.Updating
             if (File.Exists(path)) throw new InvalidDataException("A file occupies an expected update directory.");
         }
 
-        private static void CheckPending(string pending, bool requireReady)
+        private void CheckPending(string pending, bool requireReady)
         {
             EnsureSafePath(pending);
             foreach (string path in Directory.GetFileSystemEntries(pending))
@@ -264,7 +308,7 @@ namespace TotemMod.Updating
                 throw new InvalidDataException("The pending update is incomplete.");
         }
 
-        private static void RemovePending(string pending)
+        private void RemovePending(string pending)
         {
             CheckPending(pending, false);
             foreach (string name in new[] { ReadyName, ManifestName, DllName })

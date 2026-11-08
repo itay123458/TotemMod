@@ -10,6 +10,8 @@ $taskWorkspace=Split-Path $PSScriptRoot -Parent
 $null=[IO.Directory]::CreateDirectory($taskTests)
 & (Join-Path $taskWorkspace 'updater\utilla\build.ps1') -GamePath $GamePath
 if($LASTEXITCODE -ne 0) { throw 'Utilla repair helper build failed.' }
+& (Join-Path $taskWorkspace 'updater\bootstrap\build.ps1') -GamePath $GamePath
+if($LASTEXITCODE -ne 0) { throw 'Companion updater build failed.' }
 foreach($taskAsset in @('mace.png','critical_hit.png','glint.png','gust.png','hit.pcm','smash.pcm','burst.pcm')) {
     if(-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot ('assets\'+$taskAsset)))) {
         & python (Join-Path $PSScriptRoot 'tools\extract-assets.py')
@@ -29,9 +31,14 @@ $taskSources+=@(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'src') -Filt
 $taskSources+=(Join-Path $taskWorkspace 'src\PixelMeshBuilder.cs')
 $taskSources+=(Join-Path $taskWorkspace 'src\DeveloperIdentity.cs')
 $taskSources+=(Join-Path $taskWorkspace 'updater\utilla\UtillaRepairBootstrap.cs')
+$taskSources+=(Join-Path $taskWorkspace 'updater\bootstrap\CompanionBootstrap.cs')
+$taskSources+=@(Get-ChildItem -LiteralPath (Join-Path $taskWorkspace 'updater\common') -Filter '*.cs' | ForEach-Object { $_.FullName })
+$taskSources+=(Join-Path $taskWorkspace 'updater\runtime\UpdateClient.cs')
 $taskResources=@(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'assets') -File | Where-Object { $_.Extension -in '.png','.pcm' } | ForEach-Object { '/resource:'+ $_.FullName+',MaceMod.'+$_.Name })
 $taskResources+=('/resource:'+(Join-Path $taskWorkspace 'artifacts\TotemMod.UtillaFix.dll')+',TotemMod.UtillaFix.dll')
 $taskResources+=('/resource:'+(Join-Path $taskWorkspace 'artifacts\TotemMod.UtillaFix.sha256')+',TotemMod.UtillaFix.sha256')
+$taskResources+=('/resource:'+(Join-Path $taskWorkspace 'artifacts\TotemMod.CompanionUpdater.dll')+',TotemMod.CompanionUpdater.dll')
+$taskResources+=('/resource:'+(Join-Path $taskWorkspace 'artifacts\TotemMod.CompanionUpdater.sha256')+',TotemMod.CompanionUpdater.sha256')
 $taskDll=Join-Path $taskOutput 'MaceMod.dll'
 & $taskCsc /nologo /noconfig /nostdlib+ /target:library /optimize+ /warnaserror+ /nowarn:1701 /langversion:5 ('/out:'+$taskDll) @taskReferences @taskResources @taskSources
 if($LASTEXITCODE -ne 0) { throw 'Mace plugin compilation failed.' }

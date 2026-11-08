@@ -189,7 +189,7 @@ namespace TotemMod
                         Button("Check GitHub now",() => CheckForUpdates(),() => !UpdateBusy()),
                         new MenuEntry(() => "Installed: "+ModVersion,null),
                         new MenuEntry(() => updateStatus,null),
-                        new MenuEntry(() => pendingUpdate==null ? "No update waiting" : "Next launch: "+pendingUpdate,null),
+                        new MenuEntry(PendingUpdatesText,null),
                         Button("Cancel pending update",CancelPendingUpdate,() => !UpdateBusy()),
                         Button("Open GitHub releases",() => Application.OpenURL("https://github.com/itay123458/TotemMod/releases"))
                     })

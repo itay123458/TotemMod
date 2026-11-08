@@ -1,8 +1,8 @@
-# Minecraft Mace Mod 1.0.1
+# Minecraft Mace Mod 1.9.2
 
 This standalone Gorilla Tag BepInEx 5 plugin receives authenticated developer mace hits and displays their Minecraft effects. The weapon can be equipped and configured only through Totem Mod's authorized Developer menu. Installing this DLL grants receiver support; it does not grant weapon access.
 
-- **F8** opens receiver settings: incoming-hit consent, particles and sound.
+- **F8** opens receiver settings: incoming-hit consent, particles, sound and update status.
 - The standalone plugin has no controller or keyboard equipment shortcut, equipment button, or weapon/enchantment controls.
 - Gameplay requires a **private modded standard Infection / Tag room**. Participants must run a compatible authenticated mace runtime. Incoming hits default on and can be disabled in receiver settings.
 - With Totem Mod installed, a shared bridge selects one runtime. The authorized Totem Developer profile controls the weapon and takes priority. Otherwise the standalone profile controls receiver settings.
@@ -26,6 +26,15 @@ Output: `mace mod\artifacts\MaceMod.dll`. The build compiles `shared/*.cs` and `
 
 This folder builds within the Totem source workspace. It reuses the public developer-identity verifier, `../src/PixelMeshBuilder.cs`, `../tests/PixelMeshTests.cs`, and the Utilla repair sources/build/tests under `../updater/utilla`, `../compat/utilla` and `../tests`. Keep the checkout together. The standalone plugin contains no developer signing private key and requires no reference to `TotemMod.dll`.
 
+## Automatic updates
+
+Automatic updates require the flat install path `BepInEx/plugins/MaceMod.dll`; nested folders or renamed DLLs show an installation-path message and skip staging.
+
+Automatic updates default on. With the standalone plugin, the first check runs about 10 seconds after startup, followed by checks every six hours. Failed checks retry after five minutes. The F8 receiver window provides an **Automatic Mace updates** switch, status and **Check for updates now** button.
+
+When Totem Mod 1.9.2 or newer is installed, Totem manages updates for both plugins. The Mace receiver window then shows **Updates managed by Totem Mod** and directs you to Totem Settings, so there is one automatic-update switch and no duplicate network check. With older Totem versions or without Totem, Mace manages its own updates.
+
+Downloads and staging run in a background task. The updater accepts signed Mace release manifests and verifies the payload identity, version, hash and supported game build before staging it. Installed plugins remain loaded for the session; a validated companion preloader applies staged updates before plugin loading on the next game launch. DLL-only installs automatically set up that companion helper. No private signing key is included in this plugin.
 ## Utilla compatibility
 
 The DLL embeds the same validated Utilla compatibility repair used by Totem Mod. Installing only `MaceMod.dll` is supported: on first launch it adds the missing repair helper to `BepInEx/patchers` and logs that Gorilla Tag must restart. That next launch enables canonical private Modded Infection compatibility with older Utilla. Existing different repair helpers are retained and reported in the log. The standalone ZIP also contains the helper directly so it can be installed before the first launch.

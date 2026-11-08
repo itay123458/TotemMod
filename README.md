@@ -1,12 +1,12 @@
 # Totem Mod
 
-Version **1.9.1**, with Mace Mod **1.0.1**, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.9.2** for both Totem Mod and Mace Mod, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
 ## Install and controls
 
-Close Gorilla Tag, download the release ZIP and extract it into the Gorilla Tag folder. It installs `BepInEx/plugins/TotemMod.dll`, `BepInEx/patchers/TotemMod.Updater.dll` and `BepInEx/patchers/TotemMod.UtillaFix.dll`. BepInEx and Utilla are required separately. Keep one copy of each plugin. Restart after replacing DLLs and create a new private Modded Infection room. Source builders get the three Totem DLLs in `artifacts/`.
+Close Gorilla Tag, download the release ZIP and extract it into the Gorilla Tag folder. It installs `BepInEx/plugins/TotemMod.dll` plus `TotemMod.Updater.dll`, `TotemMod.CompanionUpdater.dll` and `TotemMod.UtillaFix.dll` under `BepInEx/patchers`. The separate Mace ZIP installs MaceMod.dll and its required patchers. BepInEx and Utilla are required separately. Keep one copy of each plugin. Restart after replacing DLLs and create a new private Modded Infection room. Source builders get the Totem DLLs in `artifacts/` and MaceMod.dll under `mace mod/artifacts/`.
 
 - **Y:** equip or unequip. Unequipping spends nothing. A pop spends one totem; release and press again for another.
 - **Hold X** (default 0.6 seconds), or **F7:** open/close settings.
@@ -97,11 +97,15 @@ The creator/host needs patched Utilla and a **new private Modded Infection room*
 
 ## Automatic updates
 
-Automatic updates are on by default. The plugin checks the public GitHub release feed shortly after startup, then every six hours by default. Failed checks retry after five minutes. Configure it under **Interface / Updates**, or check manually there. No GitHub login is needed to receive updates.
+Automatic updates are on by default. Totem checks its own release and the installed standalone Mace DLL from the same public GitHub release feed shortly after startup, then every six hours by default. Failed checks retry after five minutes. Configure both under **Interface / Updates**, or check manually there. No GitHub login is needed to receive updates. Mace is updated only if installed; Totem does not add the standalone plugin when it is absent.
 
-New versions must have a valid publisher RSA signature, exact DLL hash/size, expected plugin identity/version and matching tested game build. Downloads are bounded and HTTPS-only. The runtime stages verified files without replacing its loaded DLL. At the next game launch, the preloader helper checks them again and atomically installs the new plugin before plugin loading, keeping the old DLL in `BepInEx/cache/TotemModUpdater/backups/`.
+Mace-only installs have their own startup/six-hour automatic check and F8 update controls. When Totem 1.9.2 or newer is installed, Totem manages both products and Mace skips duplicate checks. Both release versions now match. Each DLL uses a separate signed manifest, fixed asset name, plugin identity and signature domain, so one product cannot be substituted for the other.
 
-Network failures, bad signatures, corrupt files, downgrades, unsupported helper versions and game mismatches retain the installed plugin. Old pending files for an incompatible game are cleared on the next check so a compatible release can be discovered. The signed updater changes Totem Mod; the separate bundled repair helper handles the supported Utilla compatibility fix described above. Neither changes game assemblies, personal settings or developer keys. Use the release ZIP once to install the updater helper; future supported Totem DLL releases update automatically.
+New versions must have a valid publisher RSA signature, exact DLL hash/size, expected plugin identity/version and matching tested game build. Downloads are bounded and HTTPS-only. Running plugins stage verified files without replacing loaded DLLs. At the next game launch, the shared companion preloader checks each queue again and atomically installs updates before either plugin loads. Previous DLLs remain outside plugins in `BepInEx/cache/TotemModUpdater/backups/` and `BepInEx/cache/MaceModUpdater/backups/`. A failed product update retains that product's old DLL and does not stop the other queue from being checked.
+
+The first DLL-only upgrade to 1.9.2 installs the companion helper automatically. Restart once more after the update-ready notice to activate it and apply a waiting Mace update. The full ZIP includes it immediately. Existing helper files with unexpected bytes are retained and reported for replacement while the game is closed.
+
+Network failures, bad signatures, corrupt files, downgrades, unsupported helper versions and game mismatches retain the installed plugin. Old pending files for an incompatible game are cleared on the next check so a compatible release can be discovered. The signed updater changes Totem and installed Mace only; the separate repair helper handles the supported Utilla fix described above. Neither changes game assemblies, personal settings or developer keys. Future supported releases of both mods update automatically.
 
 To publish a new version as the repository owner, change `ModVersion` in `src/AutoUpdateSettings.cs`, update the README and run `tools/publish-release.ps1 -Publish`. It builds/tests, signs the manifest locally, packages an explicit source allowlist, preserves repository history and publishes a new immutable version tag. The update-signing key stays under `%USERPROFILE%/.totemmod/update-signing-private.xml`; it is separate from the developer-command key and must remain private. Neither key is in GitHub or the release ZIP.
 

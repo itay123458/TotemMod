@@ -12,14 +12,20 @@ $releaseArtifacts=Join-Path $releaseRoot 'artifacts'
 $releaseDll=Join-Path $releaseArtifacts 'TotemMod.dll'
 $releaseHelper=Join-Path $releaseArtifacts 'TotemMod.Updater.dll'
 $releaseUtillaFix=Join-Path $releaseArtifacts 'TotemMod.UtillaFix.dll'
+$releaseCompanionHelper=Join-Path $releaseArtifacts 'TotemMod.CompanionUpdater.dll'
 $releaseMace=Join-Path $releaseRoot 'mace mod\artifacts\MaceMod.dll'
 $releaseKey=Join-Path $env:USERPROFILE '.totemmod\update-signing-private.xml'
 if (-not (Test-Path -LiteralPath $releaseKey)) { throw 'Publisher signing key is missing. It is not stored in the repository.' }
 $releaseManifest=Join-Path $releaseArtifacts 'totem-update.json'
 & (Join-Path $releaseArtifacts 'tests\MakeUpdateManifest.exe') $releaseDll (Join-Path $GamePath 'Gorilla Tag_Data\Managed\Assembly-CSharp.dll') $releaseKey $releaseManifest
 if ($LASTEXITCODE -ne 0) { throw 'Release signing failed.' }
+$releaseMaceManifest=Join-Path $releaseArtifacts 'mace-update.json'
+& (Join-Path $releaseArtifacts 'tests\MakeUpdateManifest.exe') $releaseMace (Join-Path $GamePath 'Gorilla Tag_Data\Managed\Assembly-CSharp.dll') $releaseKey $releaseMaceManifest mace
+if ($LASTEXITCODE -ne 0) { throw 'Mace release signing failed.' }
 $releaseMetadata=Get-Content -LiteralPath $releaseManifest -Raw | ConvertFrom-Json
 $releaseVersion=$releaseMetadata.Version
+$releaseMaceMetadata=Get-Content -LiteralPath $releaseMaceManifest -Raw | ConvertFrom-Json
+if ($releaseMaceMetadata.Version -ne $releaseVersion) { throw 'Totem and Mace must declare the same release version.' }
 $releaseTag='v'+$releaseVersion
 $releaseWork=Join-Path $releaseArtifacts ('publish-'+$releaseVersion)
 if (Test-Path -LiteralPath $releaseWork) { throw ('Release staging already exists: '+$releaseWork+'. Use a new version or review the existing staged release.') }
@@ -56,6 +62,7 @@ Copy-Item -LiteralPath (Join-Path $releaseRoot 'third_party\GorillaNotifications
 Copy-Item -LiteralPath $releaseDll -Destination (Join-Path $releasePackage 'BepInEx\plugins\TotemMod.dll')
 Copy-Item -LiteralPath $releaseHelper -Destination (Join-Path $releasePackage 'BepInEx\patchers\TotemMod.Updater.dll')
 Copy-Item -LiteralPath $releaseUtillaFix -Destination (Join-Path $releasePackage 'BepInEx\patchers\TotemMod.UtillaFix.dll')
+Copy-Item -LiteralPath $releaseCompanionHelper -Destination (Join-Path $releasePackage 'BepInEx\patchers\TotemMod.CompanionUpdater.dll')
 Copy-Item -LiteralPath (Join-Path $releaseRoot 'README.md') -Destination (Join-Path $releasePackage 'README.md')
 Copy-Item -LiteralPath (Join-Path $releaseRepo 'LICENSE') -Destination (Join-Path $releasePackage 'LICENSE')
 $releaseUnexpected=@(Get-ChildItem -LiteralPath $releaseRepo -Recurse -File | Where-Object { $_.Extension -in '.dll','.exe','.pfx','.pem','.key','.cfg','.pyc' })
@@ -71,6 +78,7 @@ $null=[IO.Directory]::CreateDirectory((Join-Path $releaseMacePackage 'BepInEx\pl
 $null=[IO.Directory]::CreateDirectory((Join-Path $releaseMacePackage 'BepInEx\patchers'))
 Copy-Item -LiteralPath $releaseMace -Destination (Join-Path $releaseMacePackage 'BepInEx\plugins\MaceMod.dll')
 Copy-Item -LiteralPath $releaseUtillaFix -Destination (Join-Path $releaseMacePackage 'BepInEx\patchers\TotemMod.UtillaFix.dll')
+Copy-Item -LiteralPath $releaseCompanionHelper -Destination (Join-Path $releaseMacePackage 'BepInEx\patchers\TotemMod.CompanionUpdater.dll')
 Copy-Item -LiteralPath (Join-Path $releaseMaceSource 'README.md') -Destination (Join-Path $releaseMacePackage 'README.md')
 Copy-Item -LiteralPath (Join-Path $releaseRepo 'LICENSE') -Destination (Join-Path $releaseMacePackage 'LICENSE')
 $releaseMaceZip=Join-Path $releaseArtifacts ('MaceMod-for-'+$releaseVersion+'.zip')
@@ -117,6 +125,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Git commit failed.' }
 if ($releaseRepositoryExists) { & git -C $releaseRepo push origin main }
 else { & gh repo create itay123458/TotemMod --public --description 'Gorilla Tag Totem Mod: presets, VR settings, Beta avatar totems and signed automatic updates.' --source $releaseRepo --remote origin --push }
 if ($LASTEXITCODE -ne 0) { throw 'Repository creation or push failed. No release was published.' }
-& gh release create $releaseTag $releaseDll $releaseHelper $releaseUtillaFix $releaseMace $releaseManifest $releaseZip $releaseMaceZip --repo itay123458/TotemMod --title ('Totem Mod '+$releaseVersion+' + Mace Mod') --notes-file $releaseNotes --latest
+& gh release create $releaseTag $releaseDll $releaseHelper $releaseUtillaFix $releaseCompanionHelper $releaseMace $releaseManifest $releaseMaceManifest $releaseZip $releaseMaceZip --repo itay123458/TotemMod --title ('Totem Mod '+$releaseVersion+' + Mace Mod') --notes-file $releaseNotes --latest
 if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
 Write-Output ('Published https://github.com/itay123458/TotemMod/releases/tag/'+$releaseTag)

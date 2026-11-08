@@ -17,10 +17,10 @@ internal static class UpdateManifestTests
         catch (InvalidDataException) { return; }
         throw new Exception(message);
     }
-    private static UpdateManifest Fixture()
+    private static UpdateManifest Fixture(UpdateProduct product=UpdateProduct.Totem)
     {
         UpdateManifest manifest = new UpdateManifest {
-            Format=1, Version="1.2.3", AssetUrl="https://github.com/"+UpdateTrust.Repository+"/releases/download/v1.2.3/TotemMod.dll",
+            Product=product, Format=1, Version="1.2.3", AssetUrl="https://github.com/"+UpdateTrust.Repository+"/releases/download/v1.2.3/"+(product==UpdateProduct.Mace ? "MaceMod.dll" : "TotemMod.dll"),
             Sha256=Hash(payload), Size=payload.Length, GameSha256=new string('a',64), MinimumUpdater=1
         };
         Sign(manifest);
@@ -85,6 +85,37 @@ internal static class UpdateManifestTests
             Reject(delegate { UpdateManifest.Read(Encoding.UTF8.GetBytes(json)); },"Invalid JSON/schema accepted at fixture "+i+".");
         }
         Reject(delegate { UpdateManifest.Read(new byte[]{255,254,253}); },"Invalid UTF-8 accepted.");
+        UpdateManifest mace=Fixture(UpdateProduct.Mace);
+        UpdateManifest maceLoaded=UpdateManifest.Read(mace.ToJson(),UpdateProduct.Mace);
+        Check(maceLoaded.Product==UpdateProduct.Mace && maceLoaded.ParsedVersion==new Version(1,2,3),"Mace product signed manifest round trip.");
+        Check(Encoding.UTF8.GetString(mace.CanonicalBytes())==canonical.Replace("TotemMod update v1\n","MaceMod update v1\n").Replace("/TotemMod.dll","/MaceMod.dll"),"Mace canonical domain and asset must be exact.");
+        UpdateManifest.VerifyPayload(maceLoaded,payload); Check(true,"Mace payload verifies with selected product.");
+        Reject(delegate { UpdateManifest.Read(mace.ToJson()); },"Default Totem reader accepted Mace manifest.");
+        Reject(delegate { UpdateManifest.Read(Fixture().ToJson(),UpdateProduct.Mace); },"Mace reader accepted Totem manifest.");
+        UpdateManifest swapped=Fixture(UpdateProduct.Mace); swapped.Signature=Fixture().Signature;
+        Reject(delegate { swapped.Validate(); },"Totem signature accepted on Mace manifest.");
+        swapped=Fixture(); swapped.Signature=mace.Signature;
+        Reject(delegate { swapped.Validate(); },"Mace signature accepted on Totem manifest.");
+        // Keep the Mace asset URL and fields unchanged, but sign under Totem's
+        // domain: product isolation must hold independently of URL validation.
+        swapped=Fixture(UpdateProduct.Mace);
+        using (RSACryptoServiceProvider rsa=new RSACryptoServiceProvider())
+        {
+            rsa.PersistKeyInCsp=false; rsa.FromXmlString(privateKey);
+            byte[] wrongDomain=Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(swapped.CanonicalBytes()).Replace("MaceMod update v1\n","TotemMod update v1\n"));
+            swapped.Signature=Convert.ToBase64String(rsa.SignData(wrongDomain,CryptoConfig.MapNameToOID("SHA256")));
+        }
+        Reject(delegate { swapped.Validate(); },"Mace accepted publisher signature for wrong product domain.");
+        swapped=Fixture(UpdateProduct.Mace); swapped.AssetUrl=swapped.AssetUrl.Replace("MaceMod.dll","TotemMod.dll");
+        Reject(delegate { swapped.Validate(); },"Mace accepted Totem asset URL.");
+        swapped=Fixture(); swapped.AssetUrl=swapped.AssetUrl.Replace("TotemMod.dll","MaceMod.dll");
+        Reject(delegate { swapped.Validate(); },"Totem accepted Mace asset URL.");
+        string maceJson=Encoding.UTF8.GetString(mace.ToJson());
+        Reject(delegate { UpdateManifest.Read(Encoding.UTF8.GetBytes(maceJson.Replace("\"Format\":1","\"Product\":1,\"Format\":1")),UpdateProduct.Mace); },"Serialized product discriminator bypassed strict eight-field schema.");
+        Reject(delegate { UpdateManifest.Read(mace.ToJson(),(UpdateProduct)99); },"Unknown locally selected product accepted.");
+        swapped=Fixture(UpdateProduct.Mace); swapped.Product=(UpdateProduct)99;
+        Reject(delegate { swapped.Validate(); },"Unknown manifest product accepted.");
+        Check(UpdateTrust.ProductGuidFor(UpdateProduct.Totem)=="totemmod.gtag.rhys" && UpdateTrust.ProductGuidFor(UpdateProduct.Mace)=="macemod.gtag.rhys","Installer product GUIDs are distinct.");
         Console.WriteLine("PASS "+checks+" update manifest/signature/hash/schema checks");
         return 0;
     }

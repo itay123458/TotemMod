@@ -18,11 +18,11 @@ internal static class UpdateClientTests
         catch (InvalidDataException) { return; }
         throw new Exception(message);
     }
-    private static UpdateManifest Fixture(int minimumUpdater)
+    private static UpdateManifest Fixture(int minimumUpdater,UpdateProduct product=UpdateProduct.Totem)
     {
         string hash;
         using (SHA256 sha=SHA256.Create()) { hash=BitConverter.ToString(sha.ComputeHash(payload)).Replace("-",""); }
-        UpdateManifest manifest=new UpdateManifest { Format=1,Version="1.2.3",AssetUrl="https://github.com/"+UpdateTrust.Repository+"/releases/download/v1.2.3/TotemMod.dll",Sha256=hash,Size=payload.Length,GameSha256=new string('a',64),MinimumUpdater=minimumUpdater };
+        UpdateManifest manifest=new UpdateManifest { Product=product,Format=1,Version="1.2.3",AssetUrl="https://github.com/"+UpdateTrust.Repository+"/releases/download/v1.2.3/"+(product==UpdateProduct.Mace ? "MaceMod.dll" : "TotemMod.dll"),Sha256=hash,Size=payload.Length,GameSha256=new string('a',64),MinimumUpdater=minimumUpdater };
         using (RSACryptoServiceProvider rsa=new RSACryptoServiceProvider())
         {
             rsa.PersistKeyInCsp=false;
@@ -85,6 +85,28 @@ internal static class UpdateClientTests
         UpdateClient.ValidateAddress(new Uri("https://objects.githubusercontent.com/a"));
         Check(true,"Expected HTTPS redirect hosts are allowed.");
         Reject(delegate { UpdateClient.FetchBytes(new Uri("http://github.com/a"),1); },"HTTP request was not rejected before network access.");
+        manifest=Fixture(1,UpdateProduct.Mace); json=manifest.ToJson(); calls=0;
+        client=new UpdateClient(delegate(Uri uri,int maximum) {
+            calls++;
+            if (calls==1) { Check(uri.AbsoluteUri==UpdateTrust.MaceManifestUrl && maximum==UpdateTrust.MaximumManifestBytes,"Mace client selects fixed Mace manifest in shared release feed."); return json; }
+            Check(uri.AbsoluteUri==manifest.AssetUrl && maximum==payload.Length,"Mace client uses signed Mace asset and bound."); return payload;
+        },UpdateProduct.Mace);
+        result=client.Fetch(new Version(1,0,0),new string('a',64));
+        Check(result.Manifest.Product==UpdateProduct.Mace && result.Product==UpdateProduct.Mace && result.Payload==payload && calls==2,"Selected Mace product and original payload preserved.");
+        calls=0; json=Fixture(1).ToJson();
+        client=new UpdateClient(delegate(Uri uri,int maximum) { calls++; return json; },UpdateProduct.Mace);
+        Reject(delegate { client.Fetch(new Version(1,0,0),new string('a',64)); },"Mace client accepted Totem response from selected feed.");
+        Check(calls==1,"Product mismatch rejected before any DLL fetch.");
+        calls=0; json=Fixture(1,UpdateProduct.Mace).ToJson();
+        client=new UpdateClient(delegate(Uri uri,int maximum) { calls++; return json; });
+        Reject(delegate { client.Fetch(new Version(1,0,0),new string('a',64)); },"Default Totem client accepted Mace response.");
+        Check(calls==1,"Default product mismatch rejected before DLL fetch.");
+        calls=0; json=Fixture(1,UpdateProduct.Mace).ToJson();
+        client=new UpdateClient(delegate(Uri uri,int maximum) { calls++; return json; },UpdateProduct.Mace);
+        Check(client.Fetch(new Version(1,2,3),new string('a',64))==null && calls==1,"Equal Mace version skips DLL download.");
+        calls=0; json=Fixture(2,UpdateProduct.Mace).ToJson();
+        Reject(delegate { client.Fetch(new Version(1,0,0),new string('a',64)); },"Mace bypassed minimum updater guard.");
+        Check(calls==1,"Mace minimum updater fails before payload fetch.");
         Console.WriteLine("PASS "+checks+" bounded update client/trust/version/compatibility checks");
         return 0;
     }

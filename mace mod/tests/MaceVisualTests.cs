@@ -38,8 +38,8 @@ internal static class MaceVisualTests
                 "Standalone must not retain developer weapon controls: "+field.Name);
         bool version=false;
         foreach(CustomAttribute attribute in plugin.CustomAttributes)
-            if(attribute.AttributeType.FullName=="BepInEx.BepInPlugin" && attribute.ConstructorArguments.Count==3 && (string)attribute.ConstructorArguments[2].Value=="1.0.1") version=true;
-        Check(version,"Receiver-only plugin must declare version 1.0.1");
+            if(attribute.AttributeType.FullName=="BepInEx.BepInPlugin" && attribute.ConstructorArguments.Count==3 && (string)attribute.ConstructorArguments[2].Value=="1.9.2") version=true;
+        Check(version,"Mace and Totem release versions must align at 1.9.2");
         Check(Calls(Method(plugin,"Configure"),"Configure"),"Standalone must keep publishing receiver consent and effects");
         Check(Calls(Method(plugin,"Update"),"Tick"),"Standalone must keep the receiver runtime ticking");
     }
@@ -58,6 +58,11 @@ internal static class MaceVisualTests
                 Check(Calls(Method(plugin,"DisconnectClient"),"Dispose"),"Disconnect must dispose runtime ownership");
                 Check(Calls(Method(plugin,"OnEnable"),"ConnectClient"),"Re-enabling standalone must reconnect runtime ownership");
                 Check(Calls(Method(plugin,"Awake"),"EnsureInstalled"),"Standalone must bootstrap canonical Utilla compatibility");
+                Check(Calls(Method(plugin,"Awake"),"InitializeMaceUpdates"),"Standalone must initialize automatic signed updates");
+                Check(Calls(Method(plugin,"Update"),"TickMaceUpdates"),"Standalone must poll completed update work on the main thread");
+                Check(Calls(Method(plugin,"OnDestroy"),"DisposeMaceUpdates"),"Standalone updater must cancel on shutdown");
+                Check(Calls(Method(plugin,"CheckMaceUpdates"),"Run"),"Standalone network work must run off the game thread");
+                Check(Calls(Method(plugin,"MaceManagedByTotem"),"get_isActiveAndEnabled"),"A disabled Totem component must not suppress standalone Mace updates");
                 Check(Constant(visuals,"SparkLimit")<=64,"Impact spark pool must be bounded to 64 total");
                 Check(Constant(visuals,"SparksPerHit")<=16,"One impact must emit at most 16 sparks");
                 foreach(MethodDefinition method in visuals.Methods)
@@ -82,7 +87,7 @@ internal static class MaceVisualTests
                 Check(Calls(Method(visuals,"Pose"),"SetPropertyBlock"),"Glint should tint the opaque mesh without extra transparent shells");
                 Check(Calls(Method(visuals,"BuildMesh"),"Build"),"Mace must use the tested closed pixel extrusion");
                 Check(!Calls(Method(visuals,"Tick"),"GetPixels32"),"Particles must cache pixel geometry");
-                foreach(string name in new[] {"TotemMod.UtillaFix.dll","TotemMod.UtillaFix.sha256"})
+                foreach(string name in new[] {"TotemMod.UtillaFix.dll","TotemMod.UtillaFix.sha256","TotemMod.CompanionUpdater.dll","TotemMod.CompanionUpdater.sha256"})
                 {
                     EmbeddedResource found=null;
                     foreach(Resource resource in assembly.MainModule.Resources) if(resource.Name==name) found=resource as EmbeddedResource;

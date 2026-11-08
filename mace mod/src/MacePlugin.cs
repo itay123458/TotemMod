@@ -8,17 +8,17 @@ using Utilla.Attributes;
 
 namespace MaceMod
 {
-    [BepInPlugin("macemod.gtag.rhys","Minecraft Mace Mod","1.0.1")]
+    [BepInPlugin("macemod.gtag.rhys","Minecraft Mace Mod",MacePlugin.MaceVersion)]
     [BepInProcess("Gorilla Tag.exe")]
     [BepInDependency("org.legoandmars.gorillatag.utilla","1.5.0")]
     [ModdedGamemode]
-    public sealed class MacePlugin : BaseUnityPlugin
+    public sealed partial class MacePlugin : BaseUnityPlugin
     {
         private MaceClient client;
         private ConfigEntry<bool> particles,sound,receiveHits;
         private bool menuOpen;
         private Photon.Realtime.Room moddedRoom;
-        private Rect window=new Rect(24,24,370,255);
+        private Rect window=new Rect(24,24,370,430);
 
         private void Awake()
         {
@@ -31,6 +31,7 @@ namespace MaceMod
             particles=Config.Bind("Effects","Particles",true,"Show authenticated Minecraft mace impact particles.");
             sound=Config.Bind("Effects","Sound",true,"Play authenticated Minecraft mace smash and wind-burst sounds.");
             receiveHits=Config.Bind("Mace","ReceiveHits",true,"Receive authenticated developer mace hits in a private modded room.");
+            InitializeMaceUpdates();
             ConnectClient();
             Logger.LogInfo("Minecraft Mace receiver ready. F8 opens receiver settings. Weapon access is limited to Totem's Developer menu.");
         }
@@ -63,6 +64,7 @@ namespace MaceMod
         }
         private void Update()
         {
+            TickMaceUpdates();
             if(client==null) return;
             if(KeyDown(KeyCode.F8)) menuOpen=!menuOpen;
             Configure(); client.Tick();
@@ -85,9 +87,10 @@ namespace MaceMod
             particles.Value=GUILayout.Toggle(particles.Value,"Minecraft impact particles");
             sound.Value=GUILayout.Toggle(sound.Value,"Minecraft impact sound");
             GUILayout.Label("Weapon access and enchantments are available only in Totem Mod's authorized Developer menu.");
+            DrawMaceUpdates();
             if(GUILayout.Button("Close")) menuOpen=false;
             GUI.DragWindow(new Rect(0,0,window.width,24));
         }
-        private void OnDestroy() { DisconnectClient(); }
+        private void OnDestroy() { DisposeMaceUpdates(); DisconnectClient(); }
     }
 }

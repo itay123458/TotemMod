@@ -439,7 +439,7 @@ namespace TotemMod
             if (sync != null) sync.Reset();
         }
 
-        private void OnDisable() { StopMace(); ResetBetaNetwork(); queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
+        private void OnDisable() { updateCancelled=true; StopMace(); ResetBetaNetwork(); queuedCommands.Clear(); commandAuthority=null; ruleHostBefore = false; state.Reset(); HideHeld(); ClearEffects(); betaVisuals.ClearCache(); notice.Clear(); if (menu != null) menu.Close(); if (sync != null) sync.Reset(); if (configDirty) { Config.Save(); configDirty = false; } }
 
         private void OnDestroy()
         {

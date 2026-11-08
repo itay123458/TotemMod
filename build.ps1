@@ -26,6 +26,9 @@ $taskSources += @(Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'updater\r
 & (Join-Path $PSScriptRoot 'updater\utilla\build.ps1') -GamePath $GamePath
 if ($LASTEXITCODE -ne 0) { throw 'Utilla repair helper build failed.' }
 $taskSources += (Join-Path $PSScriptRoot 'updater\utilla\UtillaRepairBootstrap.cs')
+& (Join-Path $PSScriptRoot 'updater\bootstrap\build.ps1') -GamePath $GamePath
+if ($LASTEXITCODE -ne 0) { throw 'Shared companion updater build failed.' }
+$taskSources += (Join-Path $PSScriptRoot 'updater\bootstrap\CompanionBootstrap.cs')
 $taskMaceRoot=Join-Path $PSScriptRoot 'mace mod'
 & (Join-Path $taskMaceRoot 'build.ps1') -GamePath $GamePath
 if ($LASTEXITCODE -ne 0) { throw 'Mace companion build failed.' }
@@ -34,6 +37,10 @@ $taskMaceResources=@(Get-ChildItem -LiteralPath (Join-Path $taskMaceRoot 'assets
 $taskRepairResources = @(
     ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.dll') + ',TotemMod.UtillaFix.dll'),
     ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.sha256') + ',TotemMod.UtillaFix.sha256')
+)
+$taskRepairResources += @(
+    ('/resource:' + (Join-Path $taskOutput 'TotemMod.CompanionUpdater.dll') + ',TotemMod.CompanionUpdater.dll'),
+    ('/resource:' + (Join-Path $taskOutput 'TotemMod.CompanionUpdater.sha256') + ',TotemMod.CompanionUpdater.sha256')
 )
 if (-not (Test-Path (Join-Path $PSScriptRoot 'assets\menu\click.pcm'))) {
     & python (Join-Path $PSScriptRoot 'tools\extract-menu-assets.py')
@@ -190,6 +197,11 @@ foreach ($taskUpdaterTestName in @('UpdateManifestTests','UpdateClientTests','Up
     else { & $taskUpdaterTest $taskUpdaterKey }
     if ($LASTEXITCODE -ne 0) { throw ($taskUpdaterTestName+' failed.') }
 }
+$taskMaceInstallerTests=Join-Path $taskTests 'MaceUpdateInstallerTests.exe'
+& $taskCsc /nologo /target:exe /langversion:5 /warnaserror+ ("/out:"+$taskMaceInstallerTests) '/reference:System.Runtime.Serialization.dll' ("/reference:"+$taskCecil) @taskUpdaterTestCommon (Join-Path $PSScriptRoot 'tests\MaceUpdateInstallerTests.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Mace installer tests compilation failed.' }
+& $taskMaceInstallerTests (Join-Path $taskMaceRoot 'artifacts\MaceMod.dll') $taskDll $taskUpdaterKey (Join-Path $taskOutput 'TotemMod.CompanionUpdater.dll')
+if ($LASTEXITCODE -ne 0) { throw 'Mace installer tests failed.' }
 } finally {
     if ($taskTemporaryTrust) {
         [IO.File]::Delete((Join-Path $taskTemporaryTrust 'test-private.xml'))

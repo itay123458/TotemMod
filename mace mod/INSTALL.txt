@@ -1,4 +1,4 @@
-MINECRAFT MACE RECEIVER 1.0.1 - LOCAL INSTALLATION
+MINECRAFT MACE RECEIVER 1.9.2 - LOCAL INSTALLATION
 
 1. Build with: & '.\mace mod\build.ps1'
 2. Close Gorilla Tag.
@@ -9,7 +9,7 @@ MINECRAFT MACE RECEIVER 1.0.1 - LOCAL INSTALLATION
    before first launch avoids that extra restart.
 5. Join a private modded standard Infection / Tag room to receive compatible
    authenticated developer mace hits.
-6. Press F8 for incoming-hit consent, particles and sound settings.
+6. Press F8 for incoming-hit consent, particles, sound and update settings.
 
 Only Totem Mod's authorized Developer menu equips or configures the mace.
 This standalone receiver grants no weapon access, controller/keyboard equip
@@ -20,6 +20,18 @@ Totem Mod is optional for receivers. Both plugins share one runtime when
 installed together, with the authorized Developer profile taking priority.
 Weapon equipment resets when changing rooms.
 
+AUTOMATIC UPDATES
+Keep the exact flat path BepInEx\plugins\MaceMod.dll. Renamed DLLs or nested
+plugin folders do not support automatic staging.
+Automatic updates default on: startup check after about 10 seconds, then
+once every six hours; failed checks retry after five minutes. Signed,
+verified updates are staged and installed on the next game launch by the
+automatically installed companion preloader.
+
+With Totem Mod 1.9.2 or newer, use its single automatic-update switch and
+check button for both mods. Mace then shows "Updates managed by Totem Mod"
+and performs no duplicate network check. Otherwise F8 has Mace's automatic
+update switch, status and Check for updates now button.
 To remove: close the game and delete MaceMod.dll from BepInEx\plugins.
 Settings live under BepInEx\config\macemod.gtag.rhys.cfg.
 

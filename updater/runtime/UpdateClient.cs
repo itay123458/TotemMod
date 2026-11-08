@@ -9,19 +9,24 @@ namespace TotemMod.Updating
     internal sealed class UpdateClient
     {
         private readonly Func<Uri, int, byte[]> fetch;
+        private readonly UpdateProduct product;
 
         internal UpdateClient() : this(FetchBytes) { }
 
-        internal UpdateClient(Func<Uri, int, byte[]> fetchBytes)
+        internal UpdateClient(UpdateProduct product) : this(FetchBytes, product) { }
+
+        internal UpdateClient(Func<Uri, int, byte[]> fetchBytes, UpdateProduct product=UpdateProduct.Totem)
         {
             if (fetchBytes == null) throw new ArgumentNullException("fetchBytes");
+            UpdateTrust.ManifestFor(product); // Reject invalid product values before any network request.
             fetch = fetchBytes;
+            this.product=product;
         }
 
         internal UpdateDownload Fetch(Version installed, string gameHash)
         {
             if (installed == null) throw new ArgumentNullException("installed");
-            UpdateManifest manifest = UpdateManifest.Read(fetch(new Uri(UpdateTrust.ManifestUrl), UpdateTrust.MaximumManifestBytes));
+            UpdateManifest manifest = UpdateManifest.Read(fetch(new Uri(UpdateTrust.ManifestFor(product)), UpdateTrust.MaximumManifestBytes),product);
             if (manifest.MinimumUpdater > UpdateTrust.UpdaterVersion)
                 throw new InvalidDataException("This release requires a newer TotemMod updater.");
             if (!manifest.SupportedGame(gameHash))

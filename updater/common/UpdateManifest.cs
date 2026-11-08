@@ -13,6 +13,8 @@ namespace TotemMod.Updating
     [DataContract]
     internal sealed class UpdateManifest
     {
+        // Selected by trusted local code, never accepted from the JSON envelope.
+        internal UpdateProduct Product=UpdateProduct.Totem;
         [DataMember(IsRequired=true, Order=0)] public int Format=0;
         [DataMember(IsRequired=true, Order=1)] public string Version=null;
         [DataMember(IsRequired=true, Order=2)] public string AssetUrl=null;
@@ -35,8 +37,9 @@ namespace TotemMod.Updating
             }
         }
 
-        internal static UpdateManifest Read(byte[] json)
+        internal static UpdateManifest Read(byte[] json, UpdateProduct product=UpdateProduct.Totem)
         {
+            if (product!=UpdateProduct.Totem && product!=UpdateProduct.Mace) throw new InvalidDataException("Unknown update product.");
             if (json == null || json.Length == 0 || json.Length > UpdateTrust.MaximumManifestBytes)
                 throw new InvalidDataException("The update manifest exceeds its permitted size or is empty.");
             try
@@ -53,6 +56,7 @@ namespace TotemMod.Updating
                     if (reader.MoveToContent() != XmlNodeType.None)
                         throw new InvalidDataException("Unexpected content follows the update manifest.");
                     if (manifest == null) throw new InvalidDataException("The update manifest is null.");
+                    manifest.Product=product;
                     manifest.Validate();
                     return manifest;
                 }
@@ -138,7 +142,8 @@ namespace TotemMod.Updating
         internal byte[] CanonicalBytes()
         {
             ValidateShape();
-            return Encoding.UTF8.GetBytes("TotemMod update v1\n" + Version + "\n" + AssetUrl + "\n" + Sha256.ToUpperInvariant() + "\n" + Size.ToString(CultureInfo.InvariantCulture) + "\n" + GameSha256.ToUpperInvariant() + "\n" + MinimumUpdater.ToString(CultureInfo.InvariantCulture) + "\n");
+            string domain=Product==UpdateProduct.Mace ? "MaceMod update v1\n" : "TotemMod update v1\n";
+            return Encoding.UTF8.GetBytes(domain + Version + "\n" + AssetUrl + "\n" + Sha256.ToUpperInvariant() + "\n" + Size.ToString(CultureInfo.InvariantCulture) + "\n" + GameSha256.ToUpperInvariant() + "\n" + MinimumUpdater.ToString(CultureInfo.InvariantCulture) + "\n");
         }
 
         internal void Validate()
@@ -160,9 +165,10 @@ namespace TotemMod.Updating
 
         private void ValidateShape()
         {
+            if (Product!=UpdateProduct.Totem && Product!=UpdateProduct.Mace) throw new InvalidDataException("Unknown update product.");
             if (Format != UpdateTrust.Protocol) throw new InvalidDataException("Unsupported update manifest format.");
             System.Version parsed = ParsedVersion;
-            string expected = "https://github.com/" + UpdateTrust.Repository + "/releases/download/v" + parsed.ToString(3) + "/TotemMod.dll";
+            string expected = "https://github.com/" + UpdateTrust.Repository + "/releases/download/v" + parsed.ToString(3) + "/" + UpdateTrust.AssetNameFor(Product);
             if (!String.Equals(AssetUrl, expected, StringComparison.Ordinal))
                 throw new InvalidDataException("The update asset is outside the trusted release location.");
             if (!IsHash(Sha256) || !IsHash(GameSha256)) throw new InvalidDataException("An update hash is invalid.");
@@ -202,12 +208,14 @@ namespace TotemMod.Updating
     internal sealed class UpdateDownload
     {
         internal readonly UpdateManifest Manifest;
+        internal readonly UpdateProduct Product;
         internal readonly byte[] Payload;
         internal UpdateDownload(UpdateManifest manifest, byte[] payload)
         {
             if (manifest == null) throw new ArgumentNullException("manifest");
             if (payload == null) throw new ArgumentNullException("payload");
             Manifest = manifest;
+            Product = manifest.Product;
             Payload = payload;
         }
     }
