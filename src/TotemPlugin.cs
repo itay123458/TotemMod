@@ -13,7 +13,7 @@ using Utilla.Attributes;
 
 namespace TotemMod
 {
-    [BepInPlugin("totemmod.gtag.rhys", "Totem Mod", TotemPlugin.ModVersion)]
+    [BepInPlugin("totemmod.gtag.rhys", "PrimalCraft", TotemPlugin.ModVersion)]
     [BepInProcess("Gorilla Tag.exe")]
     [BepInDependency("org.legoandmars.gorillatag.utilla", "1.5.0")]
     [ModdedGamemode]
@@ -102,7 +102,7 @@ namespace TotemMod
             catch (Exception error) { Log.LogWarning("Tag observers: " + error.Message + ". Tagged-state fallback remains active."); }
             try { HostProtection.Install(harmony); protectionReady = true; }
             catch (Exception error) { Log.LogWarning("Host totem protection unavailable: " + error.Message); }
-            Log.LogInfo("Totem Mod "+ModVersion+" loaded. Y equips/unequips. Hold X or press F7 for Totem Settings. MODDED ROOMS ONLY.");
+            Log.LogInfo("PrimalCraft "+ModVersion+" loaded. Y equips/unequips. Hold X or press F7 for PrimalCraft Settings. MODDED ROOMS ONLY.");
         }
 
         private bool EnsureAssets()
@@ -427,7 +427,7 @@ namespace TotemMod
             timeCapAnnounced = false;
             if (PhotonNetwork.IsMasterClient) ApplyRules(LoadSavedRules(),false);
             else rules = rules.Rehost(Guid.NewGuid().ToString("N")).ResetTimer();
-            ShowNotice("Hold X / F7 for Totem Settings",false);
+            ShowNotice("Hold X / F7 for PrimalCraft Settings",false);
             Log.LogInfo("Totem: entered modded room; active=" + Allowed + ", host protection=" + CanHostProtect(GorillaGameManager.instance as GorillaTagManager));
         }
 

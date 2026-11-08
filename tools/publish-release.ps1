@@ -71,7 +71,7 @@ foreach ($releaseTextFile in (Get-ChildItem -LiteralPath $releaseRepo -Recurse -
     $releaseText=[IO.File]::ReadAllText($releaseTextFile.FullName)
     if ($releaseText -match '(?s)<RSAKeyValue>[^"\r\n]*<D>' -or $releaseText -match '-----BEGIN (RSA |OPENSSH )?PRIVATE KEY-----' -or $releaseText -match 'gh[pousr]_[A-Za-z0-9]{25,}') { throw ('Secret-like material found in '+$releaseTextFile.FullName) }
 }
-$releaseZip=Join-Path $releaseArtifacts ('TotemMod-'+$releaseVersion+'.zip')
+$releaseZip=Join-Path $releaseArtifacts ('PrimalCraft-'+$releaseVersion+'.zip')
 Compress-Archive -Path (Join-Path $releasePackage '*') -DestinationPath $releaseZip -Force
 $releaseMacePackage=Join-Path $releaseWork 'mace-package'
 $null=[IO.Directory]::CreateDirectory((Join-Path $releaseMacePackage 'BepInEx\plugins'))
@@ -86,9 +86,9 @@ Compress-Archive -Path (Join-Path $releaseMacePackage '*') -DestinationPath $rel
 $releaseNotes=Join-Path $releaseWork 'release-notes.md'
 if ($NotesFile) { Copy-Item -LiteralPath $NotesFile -Destination $releaseNotes }
 else { @"
-Totem Mod $releaseVersion. Changes and controls are described in README.
+PrimalCraft $releaseVersion. Changes and controls are described in README.
 
-For the first install, extract TotemMod-$releaseVersion.zip into the Gorilla Tag folder while the game is closed. The ZIP installs the plugin and its updater helper; BepInEx and Utilla are required separately.
+For the first install, extract PrimalCraft-$releaseVersion.zip into the Gorilla Tag folder while the game is closed. The ZIP installs the plugin and its updater helper; BepInEx and Utilla are required separately.
 
 The mod checks on startup and periodically, stages compatible signed updates, and installs them at the next game launch with a backup. Settings are under Interface / Updates. Developer keys and local configuration are not included.
 
@@ -120,11 +120,11 @@ if ($LASTEXITCODE -ne 0) { throw 'GitHub account lookup failed.' }
 & git -C $releaseRepo config user.name itay123458
 & git -C $releaseRepo config user.email ($releaseAccountId+'+itay123458@users.noreply.github.com')
 & git -C $releaseRepo add -A -- src tests updater tools third_party compat 'mace mod' build.ps1 README.md LICENSE .gitignore
-& git -C $releaseRepo commit --quiet -m ('Release Totem Mod '+$releaseVersion)
+& git -C $releaseRepo commit --quiet -m ('Release PrimalCraft '+$releaseVersion)
 if ($LASTEXITCODE -ne 0) { throw 'Git commit failed.' }
 if ($releaseRepositoryExists) { & git -C $releaseRepo push origin main }
-else { & gh repo create itay123458/TotemMod --public --description 'Gorilla Tag Totem Mod: presets, VR settings, Beta avatar totems and signed automatic updates.' --source $releaseRepo --remote origin --push }
+else { & gh repo create itay123458/TotemMod --public --description 'PrimalCraft: Minecraft items, VR settings and signed updates for Gorilla Tag.' --source $releaseRepo --remote origin --push }
 if ($LASTEXITCODE -ne 0) { throw 'Repository creation or push failed. No release was published.' }
-& gh release create $releaseTag $releaseDll $releaseHelper $releaseUtillaFix $releaseCompanionHelper $releaseMace $releaseManifest $releaseMaceManifest $releaseZip $releaseMaceZip --repo itay123458/TotemMod --title ('Totem Mod '+$releaseVersion+' + Mace Mod') --notes-file $releaseNotes --latest
+& gh release create $releaseTag $releaseDll $releaseHelper $releaseUtillaFix $releaseCompanionHelper $releaseMace $releaseManifest $releaseMaceManifest $releaseZip $releaseMaceZip --repo itay123458/TotemMod --title ('PrimalCraft '+$releaseVersion) --notes-file $releaseNotes --latest
 if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }
 Write-Output ('Published https://github.com/itay123458/TotemMod/releases/tag/'+$releaseTag)

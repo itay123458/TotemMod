@@ -8,7 +8,7 @@ using Utilla.Attributes;
 
 namespace MaceMod
 {
-    [BepInPlugin("macemod.gtag.rhys","Minecraft Mace Mod",MacePlugin.MaceVersion)]
+    [BepInPlugin("macemod.gtag.rhys","PrimalCraft Mace Receiver",MacePlugin.MaceVersion)]
     [BepInProcess("Gorilla Tag.exe")]
     [BepInDependency("org.legoandmars.gorillatag.utilla","1.5.0")]
     [ModdedGamemode]
@@ -33,7 +33,7 @@ namespace MaceMod
             receiveHits=Config.Bind("Mace","ReceiveHits",true,"Receive authenticated developer mace hits in a private modded room.");
             InitializeMaceUpdates();
             ConnectClient();
-            Logger.LogInfo("Minecraft Mace receiver ready. F8 opens receiver settings. Weapon access is limited to Totem's Developer menu.");
+            Logger.LogInfo("Minecraft Mace receiver ready. F8 opens receiver settings. Weapon access is limited to PrimalCraft's Developer menu.");
         }
 
         private void ConnectClient()
@@ -88,7 +88,7 @@ namespace MaceMod
             receiveHits.Value=GUILayout.Toggle(receiveHits.Value,"Receive developer mace hits");
             particles.Value=GUILayout.Toggle(particles.Value,"Minecraft impact particles");
             sound.Value=GUILayout.Toggle(sound.Value,"Minecraft impact sound");
-            GUILayout.Label("Weapon access and enchantments are available only in Totem Mod's authorized Developer menu.");
+            GUILayout.Label("Weapon access and enchantments are available only in PrimalCraft's authorized Developer menu.");
             DrawMaceUpdates();
             if(GUILayout.Button("Close")) menuOpen=false;
             GUI.DragWindow(new Rect(0,0,window.width,24));

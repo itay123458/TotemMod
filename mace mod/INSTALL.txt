@@ -1,4 +1,4 @@
-MINECRAFT MACE RECEIVER 1.9.2 - LOCAL INSTALLATION
+PRIMALCRAFT MACE RECEIVER 1.9.5 - LOCAL INSTALLATION
 
 1. Build with: & '.\mace mod\build.ps1'
 2. Close Gorilla Tag.
@@ -11,12 +11,12 @@ MINECRAFT MACE RECEIVER 1.9.2 - LOCAL INSTALLATION
    authenticated developer mace hits.
 6. Press F8 for incoming-hit consent, particles, sound and update settings.
 
-Only Totem Mod's authorized Developer menu equips or configures the mace.
+Only PrimalCraft's authorized Developer menu equips or configures the mace.
 This standalone receiver grants no weapon access, controller/keyboard equip
 shortcut, equip button, enchantment controls or weapon size/power controls.
 Incoming hits default on; disable Receive developer mace hits to opt out.
 
-Totem Mod is optional for receivers. Both plugins share one runtime when
+PrimalCraft is optional for receivers. Both plugins share one runtime when
 installed together, with the authorized Developer profile taking priority.
 Weapon equipment resets when changing rooms.
 
@@ -28,8 +28,8 @@ once every six hours; failed checks retry after five minutes. Signed,
 verified updates are staged and installed on the next game launch by the
 automatically installed companion preloader.
 
-With Totem Mod 1.9.2 or newer, use its single automatic-update switch and
-check button for both mods. Mace then shows "Updates managed by Totem Mod"
+With PrimalCraft 1.9.2 or newer, use its single automatic-update switch and
+check button for both mods. Mace then shows "Updates managed by PrimalCraft"
 and performs no duplicate network check. Otherwise F8 has Mace's automatic
 update switch, status and Check for updates now button.
 To remove: close the game and delete MaceMod.dll from BepInEx\plugins.

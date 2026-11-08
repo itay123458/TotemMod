@@ -541,7 +541,7 @@ namespace TotemMod
             targets.Clear(); rows.Clear();
             focused = null; hovered = null; dragging = null;
             rowRoot = null; reticle = null;
-            root = new GameObject("Totem Settings", typeof(RectTransform), typeof(Canvas));
+            root = new GameObject("PrimalCraft Settings", typeof(RectTransform), typeof(Canvas));
             root.SetActive(false);
             rootRect = (RectTransform)root.transform;
             rootRect.sizeDelta = new Vector2(880, 700);
@@ -564,7 +564,7 @@ namespace TotemMod
             if (skin.Background != null) background.pixelsPerUnitMultiplier = 0.25f;
             background.raycastTarget = false;
             // Keep the short local click alive when Done deactivates the canvas.
-            audioRoot = new GameObject("Totem Settings Sound");
+            audioRoot = new GameObject("PrimalCraft Settings Sound");
             clickSource = audioRoot.AddComponent<AudioSource>();
             clickSource.playOnAwake = false;
             clickSource.spatialBlend = 0;
@@ -583,7 +583,7 @@ namespace TotemMod
             laser.enabled = false;
             MakeImage("Title backing", rootRect, 0, 299, 880, 102, Panel);
             MakeImage("Footer backing", rootRect, 0, -296, 880, 108, Panel);
-            MakeText("Title", rootRect, "Totem Settings", 0, 307, 800, 48, 34);
+            MakeText("Title", rootRect, "PrimalCraft Settings", 0, 307, 800, 48, 34);
             int count = categories.Length;
             float tabWidth = count == 0 ? 0 : (808f - (count - 1) * 8) / count;
             for (int i = 0; i < count; i++)

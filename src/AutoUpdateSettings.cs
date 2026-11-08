@@ -11,7 +11,7 @@ namespace TotemMod
 {
     public sealed partial class TotemPlugin
     {
-        internal const string ModVersion="1.9.4";
+        internal const string ModVersion="1.9.5";
         private ConfigEntry<bool> automaticUpdates;
         private ConfigEntry<float> updateIntervalMinutes;
         private Task<UpdateResult> updateTask;
@@ -30,7 +30,7 @@ namespace TotemMod
 
         private void InitializeAutoUpdater()
         {
-            automaticUpdates=Config.Bind("Updates","Automatic",true,"Check signed Totem and installed Mace releases on startup and at the configured interval. Verified updates apply on the next game launch.");
+            automaticUpdates=Config.Bind("Updates","Automatic",true,"Check signed PrimalCraft and installed Mace releases on startup and at the configured interval. Verified updates apply on the next game launch.");
             updateIntervalMinutes=SliderSetting("Updates","CheckIntervalMinutes",360,15,720,"Minutes between background update checks.");
             updaterRoot=Paths.BepInExRootPath;
             updaterGameAssembly=Path.Combine(Paths.ManagedPath,"Assembly-CSharp.dll");
@@ -63,7 +63,7 @@ namespace TotemMod
                 if(pendingMaceUpdate!=null && File.Exists(macePath) && new Version(pendingMaceUpdate).CompareTo(MaceUpdateInstaller.InstalledVersion(macePath))<=0)
                 { MaceUpdateInstaller.CancelPending(updaterRoot); pendingMaceUpdate=null; }
             }
-            catch (Exception error) { updateStatus="Pending update invalid"; Log.LogWarning("Pending Totem update was ignored: "+error.Message); }
+            catch (Exception error) { updateStatus="Pending update invalid"; Log.LogWarning("Pending PrimalCraft update was ignored: "+error.Message); }
             updateCheckAt=Time.unscaledTime+10;
             if (pendingUpdate!=null || pendingMaceUpdate!=null) updateStatus=PendingUpdatesText();
         }
@@ -80,7 +80,7 @@ namespace TotemMod
             bool maceUpdatesReady=companionAvailable;
             updateTask=Task.Run(() => {
                 UpdateResult result=new UpdateResult();
-                string totemStatus="Totem up to date",maceStatus=null;
+                string totemStatus="PrimalCraft up to date",maceStatus=null;
                 string gameHash;
                 try
                 {
@@ -97,10 +97,10 @@ namespace TotemMod
                     if (pending!=null && pending.ParsedVersion.CompareTo(baseline)>0) baseline=pending.ParsedVersion;
                     UpdateDownload download=new UpdateClient().Fetch(baseline,gameHash);
                     if (updateCancelled) { result.Status="Update check canceled"; return result; }
-                    if(download!=null) { UpdateInstaller.Stage(root,download); result.Version=download.Manifest.Version; totemStatus="Totem "+result.Version+" ready"; }
-                    else if(pending!=null) { result.Version=pending.Version; totemStatus="Totem "+pending.Version+" ready"; }
+                    if(download!=null) { UpdateInstaller.Stage(root,download); result.Version=download.Manifest.Version; totemStatus="PrimalCraft "+result.Version+" ready"; }
+                    else if(pending!=null) { result.Version=pending.Version; totemStatus="PrimalCraft "+pending.Version+" ready"; }
                 }
-                catch(Exception error) { result.Retry=true; totemStatus="Totem check failed: "+error.Message; }
+                catch(Exception error) { result.Retry=true; totemStatus="PrimalCraft check failed: "+error.Message; }
                 if(updateCancelled) { result.Status=totemStatus; return result; }
                 try
                 {
@@ -143,7 +143,7 @@ namespace TotemMod
                 if (result.ClearMacePending) pendingMaceUpdate=null;
                 if (result.Version!=null) { pendingUpdate=result.Version; updateToast=true; }
                 if (result.MaceVersion!=null) { pendingMaceUpdate=result.MaceVersion; updateToast=true; }
-                Log.LogInfo("Totem updater: "+updateStatus);
+                Log.LogInfo("PrimalCraft updater: "+updateStatus);
             }
             if (updateToast && Allowed)
             { ShowNotice("Mod update ready\nRestart Gorilla Tag to install",false); updateToast=false; }
@@ -166,6 +166,6 @@ namespace TotemMod
 
         private void StopAutoUpdater() { updaterDisposed=true; updateCancelled=true; }
         private string PendingUpdatesText()
-        { return pendingUpdate==null && pendingMaceUpdate==null ? "No update waiting" : "Next launch: "+(pendingUpdate!=null ? "Totem "+pendingUpdate : "")+(pendingUpdate!=null && pendingMaceUpdate!=null ? " + " : "")+(pendingMaceUpdate!=null ? "Mace "+pendingMaceUpdate : ""); }
+        { return pendingUpdate==null && pendingMaceUpdate==null ? "No update waiting" : "Next launch: "+(pendingUpdate!=null ? "PrimalCraft "+pendingUpdate : "")+(pendingUpdate!=null && pendingMaceUpdate!=null ? " + " : "")+(pendingMaceUpdate!=null ? "Mace "+pendingMaceUpdate : ""); }
     }
 }

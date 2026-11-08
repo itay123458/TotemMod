@@ -12,7 +12,7 @@ namespace MaceMod
 {
     public sealed partial class MacePlugin
     {
-        internal const string MaceVersion="1.9.4";
+        internal const string MaceVersion="1.9.5";
         private const float MaceUpdateInterval=6f*60f*60f;
         private static readonly Version MaceUpdaterVersion=new Version(MaceVersion);
         private static readonly Version TotemMaceManagerVersion=new Version(1,9,2);
@@ -33,7 +33,7 @@ namespace MaceMod
 
         private void InitializeMaceUpdates()
         {
-            maceAutomaticUpdates=Config.Bind("Updates","Automatic",true,"Check signed Mace releases on startup and every six hours. Verified updates apply on the next game launch. Totem Mod 1.9.2 or newer manages both products when installed.");
+            maceAutomaticUpdates=Config.Bind("Updates","Automatic",true,"Check signed Mace releases on startup and every six hours. Verified updates apply on the next game launch. PrimalCraft 1.9.2 or newer manages both products when installed.");
             maceWasAutomatic=maceAutomaticUpdates.Value;
             maceUpdateRoot=Paths.BepInExRootPath;
             maceGameAssembly=Path.Combine(Paths.ManagedPath,"Assembly-CSharp.dll");
@@ -67,7 +67,7 @@ namespace MaceMod
             }
             maceUpdateCheckAt=Time.unscaledTime+10f;
             maceUpdatesManaged=MaceManagedByTotem();
-            if(maceUpdatesManaged) maceUpdateStatus="Managed by Totem Mod";
+            if(maceUpdatesManaged) maceUpdateStatus="Managed by PrimalCraft";
             else if(macePendingUpdate!=null) maceUpdateStatus="Restart to install "+macePendingUpdate;
             else if(!maceUpdaterReady) maceUpdateStatus=maceUpdaterUnavailable;
         }
@@ -87,7 +87,7 @@ namespace MaceMod
             if(maceUpdatesManaged)
             {
                 maceUpdateCancelled=true;
-                maceUpdateStatus="Managed by Totem Mod";
+                maceUpdateStatus="Managed by PrimalCraft";
                 return;
             }
             if(maceUpdateTask!=null) return;
@@ -141,7 +141,7 @@ namespace MaceMod
             {
                 maceUpdatesManaged=managed;
                 maceUpdateCheckAt=Time.unscaledTime+10f;
-                maceUpdateStatus=managed?"Managed by Totem Mod":macePendingUpdate!=null?"Restart to install "+macePendingUpdate:!maceUpdaterReady?maceUpdaterUnavailable:"Not checked";
+                maceUpdateStatus=managed?"Managed by PrimalCraft":macePendingUpdate!=null?"Restart to install "+macePendingUpdate:!maceUpdaterReady?maceUpdaterUnavailable:"Not checked";
             }
             if(managed || (maceTaskAutomatic && !maceAutomaticUpdates.Value)) maceUpdateCancelled=true;
             if(maceUpdateTask!=null && maceUpdateTask.IsCompleted)
@@ -162,7 +162,7 @@ namespace MaceMod
             bool automatic=maceAutomaticUpdates.Value;
             if(automatic && !maceWasAutomatic) maceUpdateCheckAt=Time.unscaledTime+10f;
             maceWasAutomatic=automatic;
-            if(managed) { maceUpdateStatus="Managed by Totem Mod"; return; }
+            if(managed) { maceUpdateStatus="Managed by PrimalCraft"; return; }
             if(automatic && maceUpdateTask==null && Time.unscaledTime>=maceUpdateCheckAt) CheckMaceUpdates(true);
         }
 
@@ -177,8 +177,8 @@ namespace MaceMod
             GUILayout.Space(8f);
             if(maceUpdatesManaged)
             {
-                GUILayout.Label("Updates managed by Totem Mod");
-                GUILayout.Label("Use Totem Settings for automatic updates and checks.");
+                GUILayout.Label("Updates managed by PrimalCraft");
+                GUILayout.Label("Use PrimalCraft Settings for automatic updates and checks.");
                 return;
             }
             if(maceAutomaticUpdates==null) return;

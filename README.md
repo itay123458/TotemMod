@@ -1,6 +1,10 @@
-# Totem Mod
+# PrimalCraft
 
-Version **1.9.4** for both Totem Mod and Mace Mod, for the installed Gorilla Tag build, BepInEx and Utilla.
+Minecraft items and effects for Gorilla Tag, including totems and the mace.
+
+The existing DLL filenames, settings IDs and update URLs are retained so current installs keep working.
+
+Version **1.9.5** for PrimalCraft and its Mace receiver, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
@@ -30,14 +34,14 @@ The developer has six top-level categories and 26 named pages. Approved Beta acc
 | Totem | Size and Grip, Palm Position, Palm Rotation: global/held scales, grip presets, saved custom grip, position/rotation sliders and 90-degree steps. |
 | Effects | Particles, Sound and Motion, Friends and Quality, Effect Presets: amount/size/spread/colors/shape/brightness/spin; sound volume/pitch; animation style/speed/distance/height; friend range/render scale/sounds; haptics; six local effect presets and preview. |
 | Interface | Menu and Pointer, HUD, HUD Position, Notices and Controls, Updates: pointer/HUD preferences, local controls, resets, automatic updates, interval, check now, status and pending-update cancellation. |
-| Beta | Totem Model, Tint and Motion, Model Orientation, Experiments: selectable player avatar, crystal/block/star, tint/rainbow, scale, spin, bob, rotation, pop appearance, snapshot refresh and experimental presets. |
+| Beta | PrimalCraftel, Tint and Motion, Model Orientation, Experiments: selectable player avatar, crystal/block/star, tint/rainbow, scale, spin, bob, rotation, pop appearance, snapshot refresh and experimental presets. |
 | Dev | Mace and Enchantments, Mace Effects, Beta Access, Local Tools, Room Control, Practice Shortcuts, Reset and Diagnostics: all developer tools are inside this single account-only category. |
 
 Minecraft's actual menu textures and click come from the local installation. Sliders show pending developer room changes while awaiting the host. Intermediate slider values coalesce; pending actions are canceled on host or room changes.
 
 ## Beta appearance
 
-Go to **Beta / Totem Model**, enable Experimental Appearance, choose **Player model**, then use **Player** to select your own avatar or another player in the current room. **Refresh player snapshot** captures a fresh pose and appearance.
+Go to **Beta / PrimalCraftel**, enable Experimental Appearance, choose **Player model**, then use **Player** to select your own avatar or another player in the current room. **Refresh player snapshot** captures a fresh pose and appearance.
 
 Avatar models are render-only snapshots. The code bakes the existing body/face and one supported cosmetic mesh, copies their render data, and normalizes the miniature's size. It does not clone a VRRig, activate a source player, add player networking or physics, or move another player. Capture is limited to three renderers and 30,000 total vertices. Generated totems are excluded so a miniature cannot recursively capture an older miniature. Up to three nearby remote avatar totems render within 12 meters; other remote avatar totems use the classic model.
 
@@ -51,11 +55,11 @@ Other experiments include recoloring the classic totem, crystal/block/star shape
 
 ## Minecraft mace
 
-The separate receiver mod lives in `mace mod/` and builds to `mace mod/artifacts/MaceMod.dll`. It needs BepInEx and Utilla; it does not require Totem Mod to receive hits. **F8** opens incoming-hit, particle and sound preferences. **Only the developer can equip a mace, and only from Totem's Dev / Mace and Enchantments page.** B, M and desktop equip controls are removed. The developer's authenticated Steam account and private signing key are required; editing a config or becoming room master does not unlock the weapon.
+The separate receiver mod lives in `mace mod/` and builds to `mace mod/artifacts/MaceMod.dll`. It needs BepInEx and Utilla; it does not require PrimalCraft to receive hits. **F8** opens incoming-hit, particle and sound preferences. **Only the developer can equip a mace, and only from PrimalCraft's Dev / Mace and Enchantments page.** B, M and desktop equip controls are removed. The developer's authenticated Steam account and private signing key are required; editing a config or becoming room master does not unlock the weapon.
 
 Equipping shows the mace immediately in the right hand, including while the Dev menu is open. The button changes to Unequip and the status explains that menu-open hits are paused. Close the menu to swing; movement from the menu is not reused as an attack. Mace meshes choose a layer visible to the local camera instead of inheriting the offline-hand layer.
 
-Mace hits work only in **private modded standard Infection / Tag**, between users running Mace Mod 1.0.1 or Totem Mod 1.9.1 or newer. The new protocol rejects unsigned equipped states and binds the developer's proof to their actual account, room, actor, session, state and revision. Old unrestricted mace clients cannot attack updated receivers. Receiving hits can be disabled in the active mod's settings. When both mods are installed, one shared runtime handles peer messages, effects and physics. The developer's Totem settings take priority; other accounts use standalone receiver settings when installed.
+Mace hits work only in **private modded standard Infection / Tag**, between users running Mace Mod 1.0.1 or PrimalCraft 1.9.1 or newer. The new protocol rejects unsigned equipped states and binds the developer's proof to their actual account, room, actor, session, state and revision. Old unrestricted mace clients cannot attack updated receivers. Receiving hits can be disabled in the active mod's settings. When both mods are installed, one shared runtime handles peer messages, effects and physics. The developer's PrimalCraft settings take priority; other accounts use standalone receiver settings when installed.
 
 Swing the mace head into a participating player. Falling distance determines smash strength: one block equals one meter at normal player scale. Grounding, new ascent, teleports, stale samples and completed hits clear old fall credit. Hit geometry, recent swing history, range, walls, current opt-in, fresh sessions and message order are checked again by the recipient.
 
