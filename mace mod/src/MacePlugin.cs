@@ -50,8 +50,10 @@ namespace MaceMod
         private void OnDisable() { menuOpen=false; DisconnectClient(); }
         private bool Allowed()
         {
-            return isActiveAndEnabled && PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom!=null &&
-                !PhotonNetwork.CurrentRoom.IsVisible && moddedRoom==PhotonNetwork.CurrentRoom;
+            var room=PhotonNetwork.CurrentRoom;
+            if(!isActiveAndEnabled || !PhotonNetwork.InRoom || room==null || room.IsVisible) return false;
+            return moddedRoom==room || room.CustomProperties!=null && room.CustomProperties.ContainsKey(ModdedRoomMarker.Property) && room.CustomProperties.ContainsKey("gameMode") &&
+                ModdedRoomMarker.Allows(true,room.IsVisible,room.CustomProperties[ModdedRoomMarker.Property],room.CustomProperties["gameMode"]);
         }
         [ModdedGamemodeJoin]
         public void OnModdedJoin(string gamemode) { moddedRoom=PhotonNetwork.CurrentRoom; }

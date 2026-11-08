@@ -226,7 +226,7 @@ namespace TotemMod
                 }),
                 new MenuCategory("Dev",new[] {
                     new MenuPage("Mace and enchantments",new[] {
-                        DevButton("Equip / unequip mace",()=>mace.Toggle(),()=>Allowed && mace!=null),
+                        new MenuEntry(()=>mace!=null && mace.Equipped ? "Unequip mace" : "Equip mace",_=>{ if(IsDeveloper && Allowed && mace!=null) mace.Toggle(); },false,()=>IsDeveloper && Allowed && mace!=null),
                         MaceLevel("Density",maceDensity,5),MaceLevel("Knockback",maceKnockback,2),MaceLevel("Wind Burst",maceWind,3),
                         Slider("Mace power",macePower,0.25f,2,0.05f,"x"),Slider("Mace size",maceScale,0.5f,1.5f,0.05f,"x"),
                         new MenuEntry(()=>mace!=null ? mace.Status : "Mace unavailable",null),

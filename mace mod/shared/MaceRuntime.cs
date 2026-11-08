@@ -99,7 +99,7 @@ namespace MaceMod.Shared
         private bool Receiving()
         { Client profile=Profile(); return profile!=null && profile.Receive; }
         private string Status()
-        { return !Allowed() ? "Private modded Infection / Tag required" : (equipped ? "Equipped | "+fall.Blocks.ToString("0.0")+" blocks | " : "Unequipped | ")+result; }
+        { return !Allowed() ? "Private modded Infection / Tag required" : equipped && Suspended() ? "Equipped | menu open: hits paused" : (equipped ? "Equipped | "+fall.Blocks.ToString("0.0")+" blocks | " : "Unequipped | ")+result; }
         private void Say(string message)
         {
             result=message;
@@ -123,7 +123,9 @@ namespace MaceMod.Shared
         }
         private void Toggle(Client client)
         {
-            if(!EquipAuthorized(client) || !Allowed() || toggleFrame==Time.frameCount) return;
+            if(!EquipAuthorized(client)) { Say("Developer equipment access unavailable"); return; }
+            if(!Allowed()) { Say("Mace requires private modded Infection / Tag"); return; }
+            if(toggleFrame==Time.frameCount) return;
             if(!equipped)
             {
                 byte[] probe=System.Text.Encoding.UTF8.GetBytes("TotemMaceDev/menu-equip/v2");
@@ -148,7 +150,8 @@ namespace MaceMod.Shared
             if(room!=PhotonNetwork.CurrentRoom || masterActor!=PhotonNetwork.CurrentRoom.MasterClientId)
             { Reset(); transport.Reset(); room=PhotonNetwork.CurrentRoom; masterActor=room.MasterClientId; session=Guid.NewGuid().ToString("N"); }
             Client profile=Profile();
-            bool visible=equipped && !Suspended();
+            bool visible=MacePresentation.Visible(equipped);
+            bool canAttack=MacePresentation.CanAttack(equipped,Suspended());
             bool receive=Receiving();
             if(published==null || published.Equipped!=visible || published.Density!=profile.Density || published.Knockback!=profile.Knockback ||
                 published.WindBurst!=profile.Wind || published.Scale!=profile.Scale || published.Receive!=receive || published.Power!=profile.Power)
@@ -171,7 +174,7 @@ namespace MaceMod.Shared
                 visuals.ParticlesEnabled=profile.Particles; visuals.SoundEnabled=profile.Sound; visuals.Tick(Time.unscaledTime);
                 if(visible)
                 {
-                    if(held==null) held=visuals.Create(local.rightHandTransform,"Mace (held)");
+                    if(held==null) { held=visuals.Create(local.rightHandTransform,"Mace (held)"); Say("Mace ready on right hand"); }
                     visuals.Pose(held,local.rightHandTransform,profile.Scale,profile.Glint && profile.Density+profile.Knockback+profile.Wind>0,Time.unscaledTime);
                 }
                 else Hide();
@@ -179,7 +182,7 @@ namespace MaceMod.Shared
             foreach(KeyValuePair<int,Peer> entry in peers) SamplePeer(entry.Key,entry.Value,position,size);
             Vector3 tip=MaceVisuals.HeadPosition(local.rightHandTransform,profile.Scale);
             float now=Time.unscaledTime,dt=now-lastTipAt;
-            if(visible && hadTip && dt>0.001f && dt<0.15f && now>=nextSwing && (tip-lastTip).magnitude/dt>=1.1f*size)
+            if(canAttack && hadTip && dt>0.001f && dt<0.15f && now>=nextSwing && (tip-lastTip).magnitude/dt>=1.1f*size)
             {
                 foreach(KeyValuePair<int,Peer> entry in peers)
                 {
@@ -200,7 +203,7 @@ namespace MaceMod.Shared
                     break;
                 }
             }
-            lastTip=tip; lastTipAt=now; hadTip=visible;
+            lastTip=tip; lastTipAt=now; hadTip=canAttack;
         }
         private static float RigScale(VRRig rig) { return Safe(Mathf.Abs(rig.transform.lossyScale.x),1,0.2f,4); }
         private static Vector3 Body(VRRig rig,float size) { return rig.transform.position-Vector3.up*(0.2f*size); }

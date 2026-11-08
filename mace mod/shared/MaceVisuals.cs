@@ -88,7 +88,9 @@ namespace MaceMod.Shared
             Load();
             GameObject item=new GameObject(name);
             item.transform.SetParent(parent,false);
-            item.layer=parent==null?0:parent.gameObject.layer;
+            Camera camera=GorillaTagger.Instance!=null && GorillaTagger.Instance.mainCamera!=null ? GorillaTagger.Instance.mainCamera.GetComponent<Camera>() : null;
+            if(camera==null) camera=Camera.main;
+            item.layer=MacePresentation.Layer(camera!=null ? camera.cullingMask : -1);
             item.AddComponent<MeshFilter>().sharedMesh=mesh;
             SetRenderer(item.AddComponent<MeshRenderer>(),material);
             return item;

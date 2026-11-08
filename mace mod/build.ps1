@@ -70,4 +70,14 @@ $taskIntegrationTests=Join-Path $taskTests 'MaceIntegrationTests.exe'
 if($LASTEXITCODE -ne 0) { throw 'Mace integration test compilation failed.' }
 & $taskIntegrationTests $taskDll
 if($LASTEXITCODE -ne 0) { throw 'Mace integration tests failed.' }
+$taskVisibilityTests=Join-Path $taskTests 'MaceVisibilityTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskVisibilityTests) ('/reference:'+$taskCecil) (Join-Path $PSScriptRoot 'shared\MacePresentation.cs') (Join-Path $PSScriptRoot 'tests\MaceVisibilityTests.cs')
+if($LASTEXITCODE -ne 0) { throw 'Mace visibility tests compilation failed.' }
+& $taskVisibilityTests $taskDll
+if($LASTEXITCODE -ne 0) { throw 'Mace visibility tests failed.' }
+$taskMarkerTests=Join-Path $taskTests 'ModdedRoomMarkerTests.exe'
+& $taskCsc /nologo /target:exe /warnaserror+ /langversion:5 ('/out:'+$taskMarkerTests) (Join-Path $PSScriptRoot 'shared\ModdedRoomMarker.cs') (Join-Path $PSScriptRoot 'tests\ModdedRoomMarkerTests.cs')
+if($LASTEXITCODE -ne 0) { throw 'Room marker tests compilation failed.' }
+& $taskMarkerTests
+if($LASTEXITCODE -ne 0) { throw 'Room marker tests failed.' }
 

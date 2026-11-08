@@ -29,7 +29,7 @@ namespace TotemMod
         private void ConnectMace()
         {
             maceForDeveloper=IsDeveloper;
-            mace=MaceClient.Connect(maceForDeveloper ? "totem-dev" : "totem",()=>isActiveAndEnabled && Allowed,CanMaceTotem,text=>ShowNotice(text,false),()=>PopFromTag(),()=>IsDeveloper,SignDeveloperCommand);
+            mace=MaceClient.Connect(maceForDeveloper ? "totem-dev" : "totem",()=>isActiveAndEnabled && Allowed,CanMaceTotem,text=>{ Log.LogInfo("Mace: "+text); ShowNotice(text,false); },()=>PopFromTag(),()=>IsDeveloper,SignDeveloperCommand);
         }
         private void StopMace() { if(mace!=null) { mace.Dispose(); mace=null; } }
         private bool CanMaceTotem()

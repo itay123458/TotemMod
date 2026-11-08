@@ -1,6 +1,6 @@
 # Totem Mod
 
-Version **1.9.2** for both Totem Mod and Mace Mod, for the installed Gorilla Tag build, BepInEx and Utilla.
+Version **1.9.3** for both Totem Mod and Mace Mod, for the installed Gorilla Tag build, BepInEx and Utilla.
 
 [Download the latest release](https://github.com/itay123458/TotemMod/releases/latest) · [Source](https://github.com/itay123458/TotemMod)
 
@@ -53,6 +53,8 @@ Other experiments include recoloring the classic totem, crystal/block/star shape
 
 The separate receiver mod lives in `mace mod/` and builds to `mace mod/artifacts/MaceMod.dll`. It needs BepInEx and Utilla; it does not require Totem Mod to receive hits. **F8** opens incoming-hit, particle and sound preferences. **Only the developer can equip a mace, and only from Totem's Dev / Mace and Enchantments page.** B, M and desktop equip controls are removed. The developer's authenticated Steam account and private signing key are required; editing a config or becoming room master does not unlock the weapon.
 
+Equipping shows the mace immediately in the right hand, including while the Dev menu is open. The button changes to Unequip and the status explains that menu-open hits are paused. Close the menu to swing; movement from the menu is not reused as an attack. Mace meshes choose a layer visible to the local camera instead of inheriting the offline-hand layer.
+
 Mace hits work only in **private modded standard Infection / Tag**, between users running Mace Mod 1.0.1 or Totem Mod 1.9.1 or newer. The new protocol rejects unsigned equipped states and binds the developer's proof to their actual account, room, actor, session, state and revision. Old unrestricted mace clients cannot attack updated receivers. Receiving hits can be disabled in the active mod's settings. When both mods are installed, one shared runtime handles peer messages, effects and physics. The developer's Totem settings take priority; other accounts use standalone receiver settings when installed.
 
 Swing the mace head into a participating player. Falling distance determines smash strength: one block equals one meter at normal player scale. Grounding, new ascent, teleports, stale samples and completed hits clear old fall credit. Hit geometry, recent swing history, range, walls, current opt-in, fresh sessions and message order are checked again by the recipient.
@@ -91,6 +93,8 @@ The private-room patch advertises native Infection and keeps explicit modded opt
 
 The included preloader repairs the supported old Utilla automatically before plugins load. It creates an exact backup outside the plugins directory under `BepInEx/cache/TotemModUtilla/backups/`, then atomically replaces the DLL with the compatibility fix. It also finds nested Utilla installs. Already fixed copies stay unchanged. Unknown versions, duplicate Utilla plugins, locked files and a different game build are retained with a log message. Nothing deletes the old DLL before a replacement is ready. Utilla settings remain intact.
 
+Updated Totem/Mace clients also recognize the explicit private Modded Infection marker when an older Utilla misses its join callback. This fallback requires the exact marker and canonical private Infection wire format; ordinary/public rooms are rejected. Other mods still need their own compatible Utilla callbacks.
+
 When receiving only TotemMod.dll through the automatic updater, its first launch installs the repair helper. **Restart once more** to apply the Utilla repair. Extracting the full ZIP installs the helper immediately. No additional download or redistributed Utilla binary is required: the helper patches the verified installed original using the included compatibility code.
 
 The creator/host needs patched Utilla and a **new private Modded Infection room**. Vanilla friends need no plugin. Utilla mod users need patched Utilla for modded callbacks; an older Utilla sees ordinary Infection. Ordinary Infection clears the marker. The repair targets the tested game/Utilla hashes; another game build requires checking compatibility again.
@@ -104,6 +108,8 @@ Mace-only installs have their own startup/six-hour automatic check and F8 update
 New versions must have a valid publisher RSA signature, exact DLL hash/size, expected plugin identity/version and matching tested game build. Downloads are bounded and HTTPS-only. Running plugins stage verified files without replacing loaded DLLs. At the next game launch, the shared companion preloader checks each queue again and atomically installs updates before either plugin loads. Previous DLLs remain outside plugins in `BepInEx/cache/TotemModUpdater/backups/` and `BepInEx/cache/MaceModUpdater/backups/`. A failed product update retains that product's old DLL and does not stop the other queue from being checked.
 
 The first DLL-only upgrade to 1.9.2 installs the companion helper automatically. Restart once more after the update-ready notice to activate it and apply a waiting Mace update. The full ZIP includes it immediately. Existing helper files with unexpected bytes are retained and reported for replacement while the game is closed.
+
+An old mod build without download-checking code cannot bootstrap from the preloader DLL alone: the helper installs already-staged files. Replace that old mod DLL once with the current release, then leave Automatic updates enabled. Manual Check GitHub now bypasses the periodic waiting interval; downloaded updates still apply on restart.
 
 Network failures, bad signatures, corrupt files, downgrades, unsupported helper versions and game mismatches retain the installed plugin. Old pending files for an incompatible game are cleared on the next check so a compatible release can be discovered. The signed updater changes Totem and installed Mace only; the separate repair helper handles the supported Utilla fix described above. Neither changes game assemblies, personal settings or developer keys. Future supported releases of both mods update automatically.
 

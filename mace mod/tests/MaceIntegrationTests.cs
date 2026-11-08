@@ -375,6 +375,10 @@ internal static class MaceIntegrationTests
         {
             ModuleDefinition module = assembly.MainModule;
             TypeDefinition runtime = RequiredType(module, "MaceMod.Shared.MaceRuntime");
+            TypeDefinition totem=module.GetType("TotemMod.TotemPlugin");
+            TypeDefinition standalone=module.GetType("MaceMod.MacePlugin");
+            Check(CallIndex(Method(totem ?? standalone,totem!=null ? "get_RoomAllowed" : "Allowed"),"MaceMod.Shared.ModdedRoomMarker","Allows")>=0,
+                "Updated clients recognize the explicit private Infection marker when Utilla callbacks are missing");
             DeveloperAuthorization(module, runtime); SharedBus(module, runtime); LocalVelocity(module, runtime);
             CombatOrdering(runtime); ForbiddenCalls(module, runtime);
             Console.WriteLine("Verified cooperative runtime: " + path);

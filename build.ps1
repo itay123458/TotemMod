@@ -215,3 +215,5 @@ if ($LASTEXITCODE -ne 0) { throw 'Release signing tool compilation failed.' }
 Write-Output ("Verified updater helper: "+$taskUpdaterDll)
 & (Join-Path $taskMaceRoot 'artifacts\tests\MaceIntegrationTests.exe') (Join-Path $taskMaceRoot 'artifacts\MaceMod.dll') $taskDll
 if ($LASTEXITCODE -ne 0) { throw 'Cross-mod mace integration checks failed.' }
+& (Join-Path $taskMaceRoot 'artifacts\tests\MaceVisibilityTests.exe') (Join-Path $taskMaceRoot 'artifacts\MaceMod.dll') $taskDll
+if ($LASTEXITCODE -ne 0) { throw 'Cross-mod mace visibility checks failed.' }

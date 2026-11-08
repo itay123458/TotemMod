@@ -69,7 +69,13 @@ namespace TotemMod
 
         private bool RoomAllowed
         {
-            get { return RoomAccess.Allows(PhotonNetwork.InRoom, PhotonNetwork.CurrentRoom != null, inModdedRoom && moddedRoom == PhotonNetwork.CurrentRoom); }
+            get
+            {
+                var room=PhotonNetwork.CurrentRoom;
+                if(RoomAccess.Allows(PhotonNetwork.InRoom,room!=null,inModdedRoom && moddedRoom==room)) return true;
+                return room!=null && room.CustomProperties!=null && room.CustomProperties.ContainsKey(MaceMod.Shared.ModdedRoomMarker.Property) && room.CustomProperties.ContainsKey("gameMode") &&
+                    MaceMod.Shared.ModdedRoomMarker.Allows(PhotonNetwork.InRoom,room.IsVisible,room.CustomProperties[MaceMod.Shared.ModdedRoomMarker.Property],room.CustomProperties["gameMode"]);
+            }
         }
         private bool Allowed { get { return RoomAllowed && (modEnabled == null || modEnabled.Value); } }
 
