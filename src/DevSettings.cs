@@ -329,7 +329,7 @@ namespace TotemMod
         {
             if (!Allowed) return;
             if (CanEditRules() && rules.AutoStart && rules.Phase == 0) EditRules(rules.Start(PhotonNetwork.Time));
-            if (player != null && player.IsLocal) { PopFromTag(); SurvivalTagHit(); }
+            if (player != null && player.IsLocal) PopFromTag();
         }
 
         private bool RulesPermitProtection()
@@ -376,7 +376,6 @@ namespace TotemMod
                 Camera camera = head != null ? head.GetComponent<Camera>() : null;
                 if (camera != null)
                 {
-                    CloseMinecraftInventory();
                     if (menu == null)
                     {
                         if (menuAssets == null)

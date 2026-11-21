@@ -80,7 +80,6 @@ namespace TotemMod
         private MenuCategory[] MenuPages()
         {
             MenuCategory[] categories={
-                MinecraftCategory(),
                 new MenuCategory("Game",new[] {
                     new MenuPage("Presets",new[] {
                         PresetButton(0),PresetButton(1),PresetButton(2),PresetButton(3),PresetButton(4),

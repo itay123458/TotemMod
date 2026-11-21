@@ -32,7 +32,13 @@ internal static class FeatureRemovalTests
                 Check(module.GetType("TotemMod.TotemPlugin")!=null,"Totem plugin must remain");
                 Check(module.GetType("TotemMod.TotemInventory")!=null,"Totem inventory must remain");
                 Check(module.GetType("TotemMod.BetaRoomSync")!=null,"Beta access must remain");
-
+                foreach(string name in new[] {"MinecraftInventory","MinecraftHud","MinecraftHeldFood","SurvivalState","SurvivalFall","SurvivalAssets"})
+                    Check(module.GetType("TotemMod."+name)==null,"Removed inventory and survival must not be compiled: "+name);
+                foreach(Resource resource in module.Resources)
+                    Check(!resource.Name.StartsWith("PrimalCraft.Survival.",StringComparison.Ordinal),"Removed survival assets must not be embedded");
+                TypeDefinition plugin=module.GetType("TotemMod.TotemPlugin");
+                foreach(MethodDefinition method in plugin.Methods)
+                    Check(method.Name!="MinecraftCategory" && method.Name!="TickSurvival" && method.Name!="RenderSurvival" && method.Name!="RespawnSurvival","Removed survival must have no runtime or menu entry points");
             }
 
         }
@@ -42,7 +48,7 @@ internal static class FeatureRemovalTests
         try
         {
             CheckAssembly(args[0],true);
-            Console.WriteLine("PASS "+checks+" mace removal, retained totem/Beta and removed weapon checks"); return 0;
+            Console.WriteLine("PASS "+checks+" removed mace/inventory/survival and retained totem/Beta checks"); return 0;
         }
         catch(Exception error) { Console.Error.WriteLine(error.Message); return 1; }
     }

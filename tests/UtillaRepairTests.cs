@@ -108,6 +108,18 @@ internal static class UtillaRepairTests
                 return 0;
             }
             original=File.ReadAllBytes(args[0]);
+            if(Hash(File.ReadAllBytes(Path.Combine(managed,"Assembly-CSharp.dll")))!="FF7337A447B80B0FCC1738C79A98FB9DE2C72497CC68C8588FD822359E06E4A7")
+            {
+                using(Fixture f=new Fixture())
+                {
+                    string status=Apply(f);
+                    Check(status.IndexOf("unsupported game build",StringComparison.OrdinalIgnoreCase)>=0,"Unknown game builds must skip the legacy Utilla repair.");
+                    Check(Hash(File.ReadAllBytes(f.Target))==Hash(original),"Skipped legacy repair preserves the original DLL.");
+                    Check(!Directory.Exists(f.Backups),"Skipped legacy repair creates no replacement backup.");
+                }
+                Console.WriteLine("PASS "+checks+" Utilla bootstrap/identity and unsupported-game retention checks; legacy patch integration requires its supported game fixture.");
+                return 0;
+            }
             using(Fixture f=new Fixture())
             {
                 string settings=Path.Combine(f.Bep,"config"); Directory.CreateDirectory(settings);

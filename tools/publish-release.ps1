@@ -62,7 +62,7 @@ Compress-Archive -Path (Join-Path $releasePackage '*') -DestinationPath $release
 # Keep the already-published inactive retirement endpoint working for old
 # clients. No retired source or Minecraft mace assets are built or packaged.
 $releaseLegacy=Join-Path $releaseWork 'legacy-update-compatibility'
-& (Join-Path $releaseArtifacts 'tests\FetchRetirementUpdate.exe') (Join-Path $GamePath 'Gorilla Tag_Data\Managed\Assembly-CSharp.dll') $releaseLegacy
+& (Join-Path $releaseArtifacts 'tests\FetchRetirementUpdate.exe') $releaseLegacy
 if ($LASTEXITCODE -ne 0) { throw 'The signed legacy retirement update could not be verified.' }
 $releaseMace=Join-Path $releaseLegacy 'MaceMod.dll'
 $releaseMaceManifest=Join-Path $releaseLegacy 'mace-update.json'
