@@ -30,7 +30,16 @@ $taskSources += (Join-Path $PSScriptRoot 'updater\utilla\UtillaRepairBootstrap.c
 & (Join-Path $PSScriptRoot 'updater\bootstrap\build.ps1') -GamePath $GamePath
 if ($LASTEXITCODE -ne 0) { throw 'Shared companion updater build failed.' }
 $taskSources += (Join-Path $PSScriptRoot 'updater\bootstrap\CompanionBootstrap.cs')
+$taskCecil = Join-Path $taskCore 'Mono.Cecil.dll'
+$taskUpdaterDll=Join-Path $taskOutput 'TotemMod.Updater.dll'
+$taskUpdaterReferences=@(('/reference:'+(Join-Path $taskCore 'BepInEx.dll')),('/reference:'+$taskCecil),'/reference:System.Runtime.Serialization.dll')
+& $taskCsc /nologo /target:library /optimize+ /langversion:5 /warnaserror+ ("/out:"+$taskUpdaterDll) @taskUpdaterReferences @taskUpdaterCommon (Join-Path $PSScriptRoot 'updater\preloader\Preloader.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Updater preloader compilation failed.' }
+$taskPrimaryHash=Join-Path $taskOutput 'TotemMod.Updater.sha256'
+[IO.File]::WriteAllText($taskPrimaryHash,(Get-FileHash -LiteralPath $taskUpdaterDll).Hash,[Text.Encoding]::ASCII)
 $taskRepairResources = @(
+    ('/resource:'+$taskUpdaterDll+',TotemMod.Updater.dll'),
+    ('/resource:'+$taskPrimaryHash+',TotemMod.Updater.sha256'),
     ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.dll') + ',TotemMod.UtillaFix.dll'),
     ('/resource:' + (Join-Path $taskOutput 'TotemMod.UtillaFix.sha256') + ',TotemMod.UtillaFix.sha256')
 )
@@ -156,10 +165,6 @@ $taskBetaAccountTests=Join-Path $taskTests 'BetaAccountAccessTests.exe'
 if ($LASTEXITCODE -ne 0) { throw 'Beta account tests compilation failed.' }
 & $taskBetaAccountTests
 if ($LASTEXITCODE -ne 0) { throw 'Beta account tests failed.' }
-$taskUpdaterDll=Join-Path $taskOutput 'TotemMod.Updater.dll'
-$taskUpdaterReferences=@(('/reference:'+(Join-Path $taskCore 'BepInEx.dll')),('/reference:'+$taskCecil),'/reference:System.Runtime.Serialization.dll')
-& $taskCsc /nologo /target:library /optimize+ /langversion:5 /warnaserror+ ("/out:"+$taskUpdaterDll) @taskUpdaterReferences @taskUpdaterCommon (Join-Path $PSScriptRoot 'updater\preloader\Preloader.cs')
-if ($LASTEXITCODE -ne 0) { throw 'Updater preloader compilation failed.' }
 $taskUpdaterKey=Join-Path $env:USERPROFILE '.totemmod\update-signing-private.xml'
 $taskUpdaterTestCommon=@($taskUpdaterCommon)
 $taskTemporaryTrust=$null

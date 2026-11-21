@@ -11,7 +11,7 @@ namespace TotemMod
 {
     public sealed partial class TotemPlugin
     {
-        internal const string ModVersion="2.0.1";
+        internal const string ModVersion="2.0.2";
         private ConfigEntry<bool> automaticUpdates;
         private ConfigEntry<float> updateIntervalMinutes;
         private Task<UpdateResult> updateTask;
@@ -36,13 +36,7 @@ namespace TotemMod
             updaterGameAssembly=Path.Combine(Paths.ManagedPath,"Assembly-CSharp.dll");
             updaterHelper=Path.Combine(Paths.PatcherPluginPath,"TotemMod.Updater.dll");
             companionHelper=Path.Combine(Paths.PatcherPluginPath,"TotemMod.CompanionUpdater.dll");
-            try
-            {
-                string helperStatus=CompanionBootstrap.EnsureInstalled(updaterRoot);
-                if(helperStatus!=null) { Log.LogInfo(helperStatus); companionReadyToast=helperStatus=="Companion updater ready; restart Gorilla Tag"; }
-                companionAvailable=File.Exists(companionHelper) && (helperStatus==null || companionReadyToast);
-            }
-            catch(Exception error) { Log.LogWarning("Companion updater setup: "+error.Message); }
+            InstallUpdateHelpers();
             try
             {
                 string repairStatus=UtillaRepairBootstrap.EnsureInstalled(updaterRoot);
@@ -68,13 +62,36 @@ namespace TotemMod
             if (pendingUpdate!=null || pendingMaceUpdate!=null) updateStatus=PendingUpdatesText();
         }
 
+        private void InstallUpdateHelpers()
+        {
+            try
+            {
+                string status=CompanionBootstrap.EnsurePrimaryInstalled(updaterRoot);
+                if(status!=null) Log.LogInfo(status);
+                if(status=="Primary updater ready; restart Gorilla Tag") companionReadyToast=true;
+            }
+            catch(Exception error) { Log.LogWarning("Primary updater setup: "+error.Message); }
+            try
+            {
+                string helperStatus=CompanionBootstrap.EnsureInstalled(updaterRoot);
+                if(helperStatus!=null) { Log.LogInfo(helperStatus); companionReadyToast|=helperStatus=="Companion updater ready; restart Gorilla Tag"; }
+                companionAvailable=File.Exists(companionHelper) && (helperStatus==null || helperStatus=="Companion updater ready; restart Gorilla Tag");
+            }
+            catch(Exception error) { Log.LogWarning("Companion updater setup: "+error.Message); }
+        }
+
         private bool UpdateBusy() { return updateTask!=null; }
 
         private void CheckForUpdates(bool automatic=false)
         {
             if (updaterDisposed || updateTask!=null) return;
             updateCheckAt=Time.unscaledTime+SafeFloat(updateIntervalMinutes.Value,360,15,720)*60;
-            if (!File.Exists(updaterHelper) && !File.Exists(companionHelper)) { updateStatus="Updater helper missing; install the release ZIP"; return; }
+            if (!File.Exists(updaterHelper) && !File.Exists(companionHelper))
+            {
+                InstallUpdateHelpers();
+                if (!File.Exists(updaterHelper) && !File.Exists(companionHelper))
+                { updateStatus="Updater setup failed. See BepInEx log."; updateCheckAt=Time.unscaledTime+300; return; }
+            }
             updateCancelled=false; updateTaskAutomatic=automatic; updateStatus="Checking GitHub...";
             string root=updaterRoot,game=updaterGameAssembly;
             bool maceUpdatesReady=companionAvailable;
